@@ -33,4 +33,13 @@ interface UserDao {
 
     @Query("UPDATE users SET isLoggedIn = 1 WHERE userUid = :userUid")
     suspend fun setLoggedIn(userUid: String)
+
+    @Query("UPDATE users SET isEmailVerified = :verified WHERE userUid = :userUid")
+    suspend fun setEmailVerified(userUid: String, verified: Boolean)
+
+    @Query("UPDATE users SET isEmailVerified = :verified WHERE email = :email")
+    suspend fun setEmailVerifiedByEmail(email: String, verified: Boolean)
+
+    @Query("UPDATE users SET verificationCode = :code, codeExpiresAt = :expiresAt WHERE email = :email")
+    suspend fun setVerificationCode(email: String, code: String, expiresAt: Long)
 }

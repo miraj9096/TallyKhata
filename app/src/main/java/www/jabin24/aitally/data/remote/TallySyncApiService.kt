@@ -33,6 +33,16 @@ interface TallySyncApiService {
         @Query("user_uid") userUid: String
     ): Response<ApiResponse>
 
+    @POST("api/tally_sync.php")
+    suspend fun sendVerificationCode(
+        @Body request: www.jabin24.aitally.data.remote.models.SendCodeRequest
+    ): Response<ApiResponse>
+
+    @POST("api/tally_sync.php")
+    suspend fun verifyEmailCode(
+        @Body request: www.jabin24.aitally.data.remote.models.VerifyCodeRequest
+    ): Response<ApiResponse>
+
     @GET("api/tally_sync.php")
     suspend fun healthCheck(): Response<ApiResponse>
 }

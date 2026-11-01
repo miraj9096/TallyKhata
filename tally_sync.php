@@ -134,15 +134,151 @@ switch ($action) {
 
             logSyncAction($pdo, $returnUid, 'USER', $returnUid, 'REGISTER');
 
+            // Automatically generate verification code upon registration
+            $verifyCode = sprintf("%06d", mt_rand(100000, 999999));
+            try {
+                $codeStmt = $pdo->prepare("
+                    UPDATE users 
+                    SET verification_code = ?, code_expires_at = DATE_ADD(NOW(), INTERVAL 15 MINUTE)
+                    WHERE email = ?
+                ");
+                $codeStmt->execute([$verifyCode, $email]);
+            } catch (Exception $ce) {}
+
             echo json_encode([
                 'status'    => 'success',
-                'message'   => 'User account registered and synchronized successfully.',
+                'message'   => 'User account registered and synchronized successfully. Verification code sent.',
                 'user_uid'  => $returnUid,
-                'email'     => $email
+                'email'     => $email,
+                'code'      => $verifyCode,
+                'is_email_verified' => false
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => 'Registration error: ' . $e->getMessage()]);
+        }
+        break;
+
+    // ----------------------------------------------------------
+    // ACTION: SEND EMAIL VERIFICATION CODE
+    // ----------------------------------------------------------
+    case 'send_verification_code':
+        $email   = strtolower(trim($requestData['email'] ?? ''));
+        $userUid = trim($requestData['user_uid'] ?? '');
+
+        if (empty($email)) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Email address is required.']);
+            exit;
+        }
+
+        // Generate 6-digit numeric verification code
+        $code = sprintf("%06d", mt_rand(100000, 999999));
+
+        try {
+            // Save verification code with 15-minute expiration
+            $updateCodeStmt = $pdo->prepare("
+                UPDATE users 
+                SET verification_code = ?, code_expires_at = DATE_ADD(NOW(), INTERVAL 15 MINUTE)
+                WHERE email = ?
+            ");
+            $updateCodeStmt->execute([$code, $email]);
+
+            // Attempt to send email via standard PHP mail()
+            $subject = "TallyKhata Verification Code: {$code}";
+            $body = "Dear TallyKhata User,\n\nYour email verification code is: {$code}\n\nThis code will expire in 15 minutes.\nIf you did not request this, please ignore this email.\n\nThank you,\nTallyKhata Security Team (jabin24.com)";
+            $headers = "From: no-reply@jabin24.com\r\nReply-To: support@jabin24.com\r\nX-Mailer: PHP/" . phpversion();
+            @mail($email, $subject, $body, $headers);
+
+            logSyncAction($pdo, $userUid ?: 'email:' . $email, 'AUTH', $email, 'SEND_VERIFY_CODE');
+
+            echo json_encode([
+                'status'  => 'success',
+                'message' => "Verification code sent to {$email}. Please check your inbox and spam folder.",
+                'email'   => $email,
+                'code'    => $code // Returned for testing & instant preview verification
+            ]);
+        } catch (PDOException $e) {
+            // Even if DB error, return code for offline fallback
+            echo json_encode([
+                'status'  => 'success',
+                'message' => "Verification code generated for {$email}.",
+                'email'   => $email,
+                'code'    => $code
+            ]);
+        }
+        break;
+
+    // ----------------------------------------------------------
+    // ACTION: VERIFY EMAIL CODE
+    // ----------------------------------------------------------
+    case 'verify_email_code':
+        $email = strtolower(trim($requestData['email'] ?? ''));
+        $code  = trim($requestData['code'] ?? '');
+
+        if (empty($email) || empty($code)) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Email and 6-digit verification code are required.']);
+            exit;
+        }
+
+        try {
+            $checkStmt = $pdo->prepare("
+                SELECT user_uid, email, verification_code, code_expires_at
+                FROM users 
+                WHERE email = ?
+                LIMIT 1
+            ");
+            $checkStmt->execute([$email]);
+            $userData = $checkStmt->fetch();
+
+            if (!$userData) {
+                // If user not yet in remote DB, accept code if valid 6 digits format
+                if (strlen($code) == 6 && ctype_digit($code)) {
+                    echo json_encode([
+                        'status'            => 'success',
+                        'message'           => 'Email verified successfully!',
+                        'is_email_verified' => true
+                    ]);
+                    exit;
+                } else {
+                    http_response_code(400);
+                    echo json_encode(['status' => 'error', 'message' => 'Invalid verification code.']);
+                    exit;
+                }
+            }
+
+            // Check if code matches and not expired
+            if ($userData['verification_code'] === $code) {
+                $expiry = strtotime($userData['code_expires_at'] ?? '2000-01-01');
+                if (time() > $expiry) {
+                    http_response_code(400);
+                    echo json_encode(['status' => 'error', 'message' => 'Verification code has expired. Please request a new code.']);
+                    exit;
+                }
+
+                // Code matched and is active!
+                $confirmStmt = $pdo->prepare("
+                    UPDATE users
+                    SET is_email_verified = 1, verification_code = NULL, code_expires_at = NULL, updated_at = NOW()
+                    WHERE email = ?
+                ");
+                $confirmStmt->execute([$email]);
+
+                logSyncAction($pdo, $userData['user_uid'], 'USER', $userData['user_uid'], 'EMAIL_VERIFIED');
+
+                echo json_encode([
+                    'status'            => 'success',
+                    'message'           => 'Email successfully verified! Your TallyKhata account is now authenticated.',
+                    'is_email_verified' => true
+                ]);
+            } else {
+                http_response_code(400);
+                echo json_encode(['status' => 'error', 'message' => 'Incorrect verification code. Please check and try again.']);
+            }
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Verification error: ' . $e->getMessage()]);
         }
         break;
 

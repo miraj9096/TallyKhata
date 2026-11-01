@@ -52,6 +52,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isAuthLoading = MutableStateFlow(false)
     val isAuthLoading: StateFlow<Boolean> = _isAuthLoading.asStateFlow()
 
+    private val _pendingVerificationEmail = MutableStateFlow<String?>(null)
+    val pendingVerificationEmail: StateFlow<String?> = _pendingVerificationEmail.asStateFlow()
+
+    private val _isVerifyingEmail = MutableStateFlow(false)
+    val isVerifyingEmail: StateFlow<Boolean> = _isVerifyingEmail.asStateFlow()
+
+    private val _verificationStatusMessage = MutableStateFlow<String?>(null)
+    val verificationStatusMessage: StateFlow<String?> = _verificationStatusMessage.asStateFlow()
+
+    private val _lastVerificationCode = MutableStateFlow<String?>(null)
+    val lastVerificationCode: StateFlow<String?> = _lastVerificationCode.asStateFlow()
+
+    private val _showVerificationDialog = MutableStateFlow(false)
+    val showVerificationDialog: StateFlow<Boolean> = _showVerificationDialog.asStateFlow()
+
     private val _selectedCustomerUid = MutableStateFlow<String?>(null)
     val selectedCustomerUid: StateFlow<String?> = _selectedCustomerUid.asStateFlow()
 
@@ -142,7 +157,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = repository.registerUser(name, shopName, email, password, phone)
             _isAuthLoading.value = false
-            result.onSuccess {
+            result.onSuccess { createdUser ->
+                _pendingVerificationEmail.value = createdUser.email
+                _lastVerificationCode.value = createdUser.verificationCode
+                _showVerificationDialog.value = true
                 onSuccess()
             }.onFailure { err ->
                 _authError.value = err.message ?: "Registration failed"
@@ -160,10 +178,74 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = repository.loginUser(email, password)
             _isAuthLoading.value = false
-            result.onSuccess {
+            result.onSuccess { user ->
+                _pendingVerificationEmail.value = user.email
+                _lastVerificationCode.value = user.verificationCode
                 onSuccess()
             }.onFailure { err ->
                 _authError.value = err.message ?: "Authentication failed"
+            }
+        }
+    }
+
+    fun openEmailVerification(email: String) {
+        _pendingVerificationEmail.value = email.trim()
+        _verificationStatusMessage.value = null
+        _showVerificationDialog.value = true
+        // Proactively send a code if needed
+        sendEmailVerificationCode(email)
+    }
+
+    fun dismissEmailVerification() {
+        _showVerificationDialog.value = false
+        _verificationStatusMessage.value = null
+    }
+
+    fun clearVerificationStatusMessage() {
+        _verificationStatusMessage.value = null
+    }
+
+    fun sendEmailVerificationCode(email: String, onSent: (String) -> Unit = {}) {
+        val targetEmail = email.ifBlank { _pendingVerificationEmail.value ?: activeUser.value?.email ?: "" }
+        if (targetEmail.isBlank()) {
+            _verificationStatusMessage.value = "Email address cannot be empty"
+            return
+        }
+        _isVerifyingEmail.value = true
+        _verificationStatusMessage.value = "Sending verification code to $targetEmail..."
+        viewModelScope.launch {
+            val user = activeUser.value
+            val res = repository.sendVerificationCode(targetEmail, user?.userUid)
+            _isVerifyingEmail.value = false
+            res.onSuccess { code ->
+                _lastVerificationCode.value = code
+                _pendingVerificationEmail.value = targetEmail
+                _verificationStatusMessage.value = "✅ Code sent! Check inbox or use code for testing."
+                onSent(code)
+            }.onFailure { err ->
+                _verificationStatusMessage.value = "⚠️ " + (err.message ?: "Failed to send code")
+            }
+        }
+    }
+
+    fun verifyEmailCode(email: String, code: String, onSuccess: () -> Unit = {}) {
+        val targetEmail = email.ifBlank { _pendingVerificationEmail.value ?: activeUser.value?.email ?: "" }
+        val trimmedCode = code.trim()
+        if (trimmedCode.length != 6) {
+            _verificationStatusMessage.value = "Please enter the 6-digit verification code"
+            return
+        }
+        _isVerifyingEmail.value = true
+        _verificationStatusMessage.value = "Verifying code..."
+        viewModelScope.launch {
+            val res = repository.verifyEmailCode(targetEmail, trimmedCode)
+            _isVerifyingEmail.value = false
+            res.onSuccess {
+                _verificationStatusMessage.value = "🎉 Email verified successfully!"
+                _showVerificationDialog.value = false
+                onSuccess()
+            }.onFailure { err ->
+                _verificationStatusMessage.value = "❌ " + (err.message ?: "Verification failed")
             }
         }
     }
@@ -172,6 +254,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.logout()
             _selectedCustomerUid.value = null
+            _pendingVerificationEmail.value = null
+            _showVerificationDialog.value = false
         }
     }
 

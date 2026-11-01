@@ -14,5 +14,8 @@ data class UserEntity(
     val phone: String,
     val createdAt: Long = System.currentTimeMillis(),
     val isLoggedIn: Boolean = true,
-    val syncStatus: String = "SYNCED" // "SYNCED", "PENDING"
+    val syncStatus: String = "SYNCED", // "SYNCED", "PENDING"
+    val isEmailVerified: Boolean = false,
+    val verificationCode: String? = null,
+    val codeExpiresAt: Long = 0L
 )

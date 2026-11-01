@@ -34,7 +34,8 @@ data class UserDto(
     @Json(name = "shop_name") val shopName: String,
     @Json(name = "email") val email: String,
     @Json(name = "phone") val phone: String,
-    @Json(name = "password_hash") val passwordHash: String? = null
+    @Json(name = "password_hash") val passwordHash: String? = null,
+    @Json(name = "is_email_verified") val isEmailVerified: Boolean? = false
 )
 
 @JsonClass(generateAdapter = true)
@@ -56,6 +57,21 @@ data class LoginRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class SendCodeRequest(
+    @Json(name = "action") val action: String = "send_verification_code",
+    @Json(name = "email") val email: String,
+    @Json(name = "user_uid") val userUid: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class VerifyCodeRequest(
+    @Json(name = "action") val action: String = "verify_email_code",
+    @Json(name = "email") val email: String,
+    @Json(name = "code") val code: String,
+    @Json(name = "user_uid") val userUid: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class SyncPushRequest(
     @Json(name = "action") val action: String = "sync",
     @Json(name = "user_uid") val userUid: String,
@@ -70,6 +86,8 @@ data class ApiResponse(
     @Json(name = "items_synced") val itemsSynced: Int? = null,
     @Json(name = "synced_at") val syncedAt: Long? = null,
     @Json(name = "user") val user: UserDto? = null,
+    @Json(name = "is_email_verified") val isEmailVerified: Boolean? = null,
+    @Json(name = "code") val code: String? = null,
     @Json(name = "customers") val customers: List<CustomerDto>? = null,
     @Json(name = "transactions") val transactions: List<TransactionDto>? = null
 )

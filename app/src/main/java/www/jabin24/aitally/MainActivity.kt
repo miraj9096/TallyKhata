@@ -5,12 +5,16 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CloudSync
@@ -26,7 +30,9 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,6 +52,7 @@ import www.jabin24.aitally.data.local.entity.TransactionEntity
 import www.jabin24.aitally.ui.MainViewModel
 import www.jabin24.aitally.ui.components.AddCustomerDialog
 import www.jabin24.aitally.ui.components.AddTransactionDialog
+import www.jabin24.aitally.ui.components.EmailVerificationDialog
 import www.jabin24.aitally.ui.components.SmsReminderDialog
 import www.jabin24.aitally.ui.screens.AuthScreen
 import www.jabin24.aitally.ui.screens.CustomerDetailScreen
@@ -101,6 +108,12 @@ fun TallyKhataApp(
     val pinLockEnabled by viewModel.pinLockEnabled.collectAsStateWithLifecycle()
     val smsSignature by viewModel.smsSignature.collectAsStateWithLifecycle()
 
+    val showVerificationDialog by viewModel.showVerificationDialog.collectAsStateWithLifecycle()
+    val isVerifyingEmail by viewModel.isVerifyingEmail.collectAsStateWithLifecycle()
+    val verificationStatusMessage by viewModel.verificationStatusMessage.collectAsStateWithLifecycle()
+    val lastVerificationCode by viewModel.lastVerificationCode.collectAsStateWithLifecycle()
+    val pendingVerificationEmail by viewModel.pendingVerificationEmail.collectAsStateWithLifecycle()
+
     var currentTab by remember { mutableStateOf(NavigationTab.LEDGER) }
     var showAddCustomerDialog by remember { mutableStateOf(false) }
     var addTxData by remember { mutableStateOf<Triple<CustomerEntity, Double, String>?>(null) }
@@ -115,6 +128,24 @@ fun TallyKhataApp(
     }
 
     // Dialogs
+    if (showVerificationDialog) {
+        EmailVerificationDialog(
+            email = pendingVerificationEmail ?: activeUser?.email ?: "",
+            demoCode = lastVerificationCode,
+            isLoading = isVerifyingEmail,
+            statusMessage = verificationStatusMessage,
+            onDismiss = { viewModel.dismissEmailVerification() },
+            onVerify = { code ->
+                viewModel.verifyEmailCode(pendingVerificationEmail ?: activeUser?.email ?: "", code) {
+                    Toast.makeText(context, "Email verified successfully! / ইমেইল যাচাই সম্পন্ন", Toast.LENGTH_LONG).show()
+                }
+            },
+            onResend = {
+                viewModel.sendEmailVerificationCode(pendingVerificationEmail ?: activeUser?.email ?: "")
+            }
+        )
+    }
+
     if (showAddCustomerDialog) {
         AddCustomerDialog(
             onDismiss = { showAddCustomerDialog = false },
@@ -172,13 +203,23 @@ fun TallyKhataApp(
     if (activeUser == null) {
         // Authenticate user via Email/Password or Instant Offline Access
         AuthScreen(
-            isLoading = isAuthLoading,
+            isLoading = isAuthLoading || isVerifyingEmail,
             errorMessage = authError,
+            verificationStatusMessage = verificationStatusMessage,
+            lastGeneratedCode = lastVerificationCode,
             onLogin = { email, pass ->
                 viewModel.login(email, pass)
             },
             onRegister = { name, shop, email, pass, phone ->
                 viewModel.register(name, shop, email, pass, phone)
+            },
+            onSendVerificationCode = { email ->
+                viewModel.sendEmailVerificationCode(email)
+            },
+            onVerifyEmailCode = { email, code ->
+                viewModel.verifyEmailCode(email, code) {
+                    Toast.makeText(context, "Email verified successfully! / ইমেইল যাচাই সম্পন্ন", Toast.LENGTH_SHORT).show()
+                }
             },
             onOfflineDemoAccess = {
                 // Instant demo account in offline mode
@@ -224,76 +265,89 @@ fun TallyKhataApp(
             Scaffold(
                 snackbarHost = { SnackbarHost(snackbarHostState) },
                 bottomBar = {
-                    NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 10.dp,
+                        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
                     ) {
-                        NavigationBarItem(
-                            selected = currentTab == NavigationTab.LEDGER,
-                            onClick = { currentTab = NavigationTab.LEDGER },
-                            icon = { Icon(Icons.Default.Book, contentDescription = "Khata") },
-                            label = { Text("হিসাব খাতা", fontWeight = FontWeight.SemiBold) },
-                            colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = TallyPrimary.copy(alpha = 0.15f),
-                                selectedIconColor = TallyPrimary,
-                                selectedTextColor = TallyPrimary
-                            ),
-                            modifier = Modifier.testTag("nav_ledger")
-                        )
+                        NavigationBar(
+                            containerColor = Color.Transparent,
+                            tonalElevation = 0.dp
+                        ) {
+                            NavigationBarItem(
+                                selected = currentTab == NavigationTab.LEDGER,
+                                onClick = { currentTab = NavigationTab.LEDGER },
+                                icon = { Icon(Icons.Default.Book, contentDescription = "Khata") },
+                                label = { Text("হিসাব খাতা", fontWeight = FontWeight.SemiBold) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = TallyPrimary.copy(alpha = 0.15f),
+                                    selectedIconColor = TallyPrimary,
+                                    selectedTextColor = TallyPrimary
+                                ),
+                                modifier = Modifier.testTag("nav_ledger")
+                            )
 
-                        NavigationBarItem(
-                            selected = currentTab == NavigationTab.TRANSACTIONS,
-                            onClick = { currentTab = NavigationTab.TRANSACTIONS },
-                            icon = { Icon(Icons.Default.ReceiptLong, contentDescription = "Transactions") },
-                            label = { Text("লেনদেন", fontWeight = FontWeight.SemiBold) },
-                            colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = TallyPrimary.copy(alpha = 0.15f),
-                                selectedIconColor = TallyPrimary,
-                                selectedTextColor = TallyPrimary
-                            ),
-                            modifier = Modifier.testTag("nav_transactions")
-                        )
+                            NavigationBarItem(
+                                selected = currentTab == NavigationTab.TRANSACTIONS,
+                                onClick = { currentTab = NavigationTab.TRANSACTIONS },
+                                icon = { Icon(Icons.Default.ReceiptLong, contentDescription = "Transactions") },
+                                label = { Text("লেনদেন", fontWeight = FontWeight.SemiBold) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = TallyPrimary.copy(alpha = 0.15f),
+                                    selectedIconColor = TallyPrimary,
+                                    selectedTextColor = TallyPrimary
+                                ),
+                                modifier = Modifier.testTag("nav_transactions")
+                            )
 
-                        NavigationBarItem(
-                            selected = currentTab == NavigationTab.SYNC,
-                            onClick = { currentTab = NavigationTab.SYNC },
-                            icon = {
-                                BadgedBox(
-                                    badge = {
-                                        if (pendingSyncCount > 0) {
-                                            Badge(
-                                                containerColor = Color(0xFFFFC107),
-                                                contentColor = Color.Black
-                                            ) {
-                                                Text("$pendingSyncCount")
+                            NavigationBarItem(
+                                selected = currentTab == NavigationTab.SYNC,
+                                onClick = { currentTab = NavigationTab.SYNC },
+                                icon = {
+                                    BadgedBox(
+                                        badge = {
+                                            if (pendingSyncCount > 0) {
+                                                Badge(
+                                                    containerColor = Color(0xFFFFC107),
+                                                    contentColor = Color.Black
+                                                ) {
+                                                    Text("$pendingSyncCount")
+                                                }
                                             }
                                         }
+                                    ) {
+                                        Icon(Icons.Default.CloudSync, contentDescription = "Sync")
                                     }
-                                ) {
-                                    Icon(Icons.Default.CloudSync, contentDescription = "Sync")
-                                }
-                            },
-                            label = { Text("সিঙ্ক", fontWeight = FontWeight.SemiBold) },
-                            colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = TallyPrimary.copy(alpha = 0.15f),
-                                selectedIconColor = TallyPrimary,
-                                selectedTextColor = TallyPrimary
-                            ),
-                            modifier = Modifier.testTag("nav_sync")
-                        )
+                                },
+                                label = { Text("সিঙ্ক", fontWeight = FontWeight.SemiBold) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = TallyPrimary.copy(alpha = 0.15f),
+                                    selectedIconColor = TallyPrimary,
+                                    selectedTextColor = TallyPrimary
+                                ),
+                                modifier = Modifier.testTag("nav_sync")
+                            )
 
-                        NavigationBarItem(
-                            selected = currentTab == NavigationTab.SETTINGS,
-                            onClick = { currentTab = NavigationTab.SETTINGS },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                            label = { Text("সেটিংস", fontWeight = FontWeight.SemiBold) },
-                            colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = TallyPrimary.copy(alpha = 0.15f),
-                                selectedIconColor = TallyPrimary,
-                                selectedTextColor = TallyPrimary
-                            ),
-                            modifier = Modifier.testTag("nav_settings")
-                        )
+                            NavigationBarItem(
+                                selected = currentTab == NavigationTab.SETTINGS,
+                                onClick = { currentTab = NavigationTab.SETTINGS },
+                                icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                                label = { Text("সেটিংস", fontWeight = FontWeight.SemiBold) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = TallyPrimary.copy(alpha = 0.15f),
+                                    selectedIconColor = TallyPrimary,
+                                    selectedTextColor = TallyPrimary
+                                ),
+                                modifier = Modifier.testTag("nav_settings")
+                            )
+                        }
                     }
                 }
             ) { innerPadding ->
@@ -378,6 +432,7 @@ fun TallyKhataApp(
                                 onSetPinLock = { viewModel.setPinLockEnabled(it) },
                                 onSetSmsSignature = { viewModel.setSmsSignature(it) },
                                 onOpenSyncScreen = { currentTab = NavigationTab.SYNC },
+                                onVerifyEmailClick = { email -> viewModel.openEmailVerification(email) },
                                 onLogout = { viewModel.logout() }
                             )
                         }

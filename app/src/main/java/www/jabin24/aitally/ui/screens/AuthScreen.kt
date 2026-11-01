@@ -3,6 +3,8 @@ package www.jabin24.aitally.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -65,20 +67,29 @@ import www.jabin24.aitally.R
 import www.jabin24.aitally.ui.theme.TallyCashIn
 import www.jabin24.aitally.ui.theme.TallyPrimary
 
+import androidx.compose.material.icons.filled.MarkEmailRead
+import androidx.compose.material.icons.filled.Pin
+import androidx.compose.material.icons.filled.Refresh
+
 @Composable
 fun AuthScreen(
     isLoading: Boolean,
     errorMessage: String?,
+    verificationStatusMessage: String? = null,
+    lastGeneratedCode: String? = null,
     onLogin: (email: String, pass: String) -> Unit,
     onRegister: (name: String, shop: String, email: String, pass: String, phone: String) -> Unit,
+    onSendVerificationCode: (email: String) -> Unit = {},
+    onVerifyEmailCode: (email: String, code: String) -> Unit = { _, _ -> },
     onOfflineDemoAccess: () -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(0) } // 0: Login, 1: Register
+    var selectedTab by remember { mutableStateOf(0) } // 0: Login, 1: Register, 2: Verify Code
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var shopName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var inputOtpCode by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
     Surface(
@@ -171,14 +182,23 @@ fun AuthScreen(
                         Tab(
                             selected = selectedTab == 0,
                             onClick = { selectedTab = 0 },
-                            text = { Text("Sign In", fontWeight = FontWeight.Bold) },
+                            text = { Text("Sign In", fontWeight = FontWeight.Bold, fontSize = 13.sp) },
                             modifier = Modifier.testTag("tab_login")
                         )
                         Tab(
                             selected = selectedTab == 1,
                             onClick = { selectedTab = 1 },
-                            text = { Text("Create Account", fontWeight = FontWeight.Bold) },
+                            text = { Text("Register", fontWeight = FontWeight.Bold, fontSize = 13.sp) },
                             modifier = Modifier.testTag("tab_register")
+                        )
+                        Tab(
+                            selected = selectedTab == 2,
+                            onClick = {
+                                selectedTab = 2
+                                if (email.isNotBlank()) onSendVerificationCode(email)
+                            },
+                            text = { Text("Verify Code", fontWeight = FontWeight.Bold, fontSize = 13.sp) },
+                            modifier = Modifier.testTag("tab_verify_code")
                         )
                     }
 
@@ -195,6 +215,31 @@ fun AuthScreen(
                             Text(
                                 text = errorMessage,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+
+                    if (!verificationStatusMessage.isNullOrBlank()) {
+                        Surface(
+                            color = if (verificationStatusMessage.contains("✅") || verificationStatusMessage.contains("🎉")) {
+                                TallyCashIn.copy(alpha = 0.12f)
+                            } else {
+                                MaterialTheme.colorScheme.errorContainer
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                        ) {
+                            Text(
+                                text = verificationStatusMessage,
+                                color = if (verificationStatusMessage.contains("✅") || verificationStatusMessage.contains("🎉")) {
+                                    TallyCashIn
+                                } else {
+                                    MaterialTheme.colorScheme.onErrorContainer
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(10.dp)
                             )
@@ -259,58 +304,152 @@ fun AuthScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Password Field
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Password *") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                    if (selectedTab != 2) {
+                        // Password Field for Login and Register
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text("Password *") },
+                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Icon(
+                                        if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                                    )
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("auth_password_input")
+                        )
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        Button(
+                            onClick = {
+                                if (selectedTab == 0) {
+                                    onLogin(email, password)
+                                } else {
+                                    onRegister(name, shopName, email, password, phone)
+                                }
+                            },
+                            enabled = !isLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = TallyPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("auth_submit_button")
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(
+                                    text = if (selectedTab == 0) "Sign In to TallyKhata" else "Create Account & Verify Code",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
                                 )
                             }
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("auth_password_input")
-                    )
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    Button(
-                        onClick = {
-                            if (selectedTab == 0) {
-                                onLogin(email, password)
-                            } else {
-                                onRegister(name, shopName, email, password, phone)
+                        }
+                    } else {
+                        // Tab 2: Email Verification by Code
+                        if (!lastGeneratedCode.isNullOrBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = TallyCashIn.copy(alpha = 0.1f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { inputOtpCode = lastGeneratedCode }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Generated Code: $lastGeneratedCode",
+                                        fontWeight = FontWeight.Bold,
+                                        color = TallyCashIn,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        text = "Auto-fill",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TallyPrimary,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
                             }
-                        },
-                        enabled = !isLoading,
-                        colors = ButtonDefaults.buttonColors(containerColor = TallyPrimary),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .testTag("auth_submit_button")
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text(
-                                text = if (selectedTab == 0) "Sign In to TallyKhata" else "Create TallyKhata Account",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        OutlinedTextField(
+                            value = inputOtpCode,
+                            onValueChange = { input ->
+                                val digits = input.filter { it.isDigit() }.take(6)
+                                inputOtpCode = digits
+                            },
+                            label = { Text("6-Digit Verification Code (যাচাই কোড) *") },
+                            placeholder = { Text("e.g. 849201") },
+                            leadingIcon = { Icon(Icons.Default.MarkEmailRead, contentDescription = null) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("verify_code_input")
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(
+                                onClick = { onSendVerificationCode(email) },
+                                enabled = !isLoading && email.isNotBlank()
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Resend Code", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Button(
+                            onClick = { onVerifyEmailCode(email, inputOtpCode) },
+                            enabled = !isLoading && inputOtpCode.length == 6,
+                            colors = ButtonDefaults.buttonColors(containerColor = TallyPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("verify_code_submit_button")
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(
+                                    text = "Verify Email • ইমেইল যাচাই করুন",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                            }
                         }
                     }
                 }

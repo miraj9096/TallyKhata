@@ -83,6 +83,10 @@ import www.jabin24.aitally.ui.theme.TallyCashIn
 import www.jabin24.aitally.ui.theme.TallyPrimary
 import www.jabin24.aitally.util.SmsHelper
 
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.MarkEmailRead
+import androidx.compose.material.icons.filled.Warning
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -99,6 +103,7 @@ fun SettingsScreen(
     onSetPinLock: (Boolean) -> Unit,
     onSetSmsSignature: (String) -> Unit,
     onOpenSyncScreen: () -> Unit,
+    onVerifyEmailClick: (String) -> Unit = {},
     onLogout: () -> Unit
 ) {
     BackHandler { onBack() }
@@ -440,6 +445,59 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Email: ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(user?.email ?: "N/A", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Email Verification Status Pill
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (user?.isEmailVerified == true) TallyCashIn.copy(alpha = 0.1f) else Color(0xFFFF9800).copy(alpha = 0.12f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = if (user?.isEmailVerified == true) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = if (user?.isEmailVerified == true) TallyCashIn else Color(0xFFE65100),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (user?.isEmailVerified == true) "Email Verified • ইমেইল যাচাইকৃত" else "Unverified • ইমেইল যাচাই করা হয়নি",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (user?.isEmailVerified == true) TallyCashIn else Color(0xFFE65100)
+                                    )
+                                }
+
+                                if (user?.isEmailVerified != true) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = TallyPrimary,
+                                        modifier = Modifier
+                                            .clickable { onVerifyEmailClick(user?.email ?: "") }
+                                            .testTag("verify_email_badge_button")
+                                    ) {
+                                        Text(
+                                            text = "Verify Code",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(6.dp))

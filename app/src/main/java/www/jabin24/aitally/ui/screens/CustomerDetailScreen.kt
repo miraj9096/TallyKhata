@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -158,22 +160,29 @@ fun CustomerDetailScreen(
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 8.dp,
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // You Gave (বাকি দিলাম)
                     Button(
                         onClick = onAddCreditClick,
                         colors = ButtonDefaults.buttonColors(containerColor = TallyCashOut),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(50.dp)
+                            .height(52.dp)
                             .testTag("you_gave_button")
                     ) {
                         Text("বাকি দিলাম", fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -183,10 +192,10 @@ fun CustomerDetailScreen(
                     Button(
                         onClick = onAddDebitClick,
                         colors = ButtonDefaults.buttonColors(containerColor = TallyCashIn),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(50.dp)
+                            .height(52.dp)
                             .testTag("you_got_button")
                     ) {
                         Text("টাকা পেলাম", fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -201,15 +210,15 @@ fun CustomerDetailScreen(
                 .padding(paddingValues),
             contentPadding = PaddingValues(16.dp)
         ) {
-            // Customer Balance Summary Card
+            // Customer Balance Summary Card (Elevated Relative Card)
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(14.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(18.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -229,16 +238,47 @@ fun CustomerDetailScreen(
                                 )
                             }
 
-                            // SMS Reminder Button
+                            // Quick SMS Reminder Button
                             Button(
                                 onClick = onSendSmsClick,
                                 colors = ButtonDefaults.buttonColors(containerColor = TallyPrimary),
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.testTag("send_sms_reminder_fab")
                             ) {
                                 Icon(Icons.Default.Message, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("তাগাদা SMS")
+                                Text("তাগাদা SMS", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Relative Quick Action Bar for Customer
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${customer.phone}"))
+                                    context.startActivity(intent)
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Call", fontSize = 13.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = onSendSmsClick,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Message, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("SMS", fontSize = 13.sp)
                             }
                         }
 

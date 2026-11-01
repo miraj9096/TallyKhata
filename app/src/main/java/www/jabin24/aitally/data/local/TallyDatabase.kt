@@ -20,7 +20,7 @@ import www.jabin24.aitally.data.local.entity.UserEntity
         TransactionEntity::class,
         SyncQueueEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class TallyDatabase : RoomDatabase() {

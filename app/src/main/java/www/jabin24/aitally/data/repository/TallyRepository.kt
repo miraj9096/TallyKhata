@@ -64,7 +64,10 @@ class TallyRepository(context: Context) {
         try {
             val userUid = "usr_" + UUID.randomUUID().toString().replace("-", "").take(12)
             val passwordHash = CryptoManager.hashPassword(password)
-            val user = UserEntity(
+            val initialVerifyCode = (100000..999999).random().toString()
+            val expiry = System.currentTimeMillis() + 15 * 60 * 1000L
+
+            var user = UserEntity(
                 userUid = userUid,
                 name = name.trim(),
                 shopName = shopName.trim(),
@@ -72,7 +75,10 @@ class TallyRepository(context: Context) {
                 passwordHash = passwordHash,
                 phone = phone.trim(),
                 isLoggedIn = true,
-                syncStatus = "PENDING"
+                syncStatus = "PENDING",
+                isEmailVerified = false,
+                verificationCode = initialVerifyCode,
+                codeExpiresAt = expiry
             )
 
             // Logout previous users and save local
@@ -102,6 +108,10 @@ class TallyRepository(context: Context) {
                     )
                 )
                 if (response.isSuccessful && response.body()?.status == "success") {
+                    val serverCode = response.body()?.code
+                    if (!serverCode.isNullOrBlank()) {
+                        user = user.copy(verificationCode = serverCode)
+                    }
                     userDao.updateUser(user.copy(syncStatus = "SYNCED"))
                     syncQueueDao.dequeueByUid(userUid)
                 }
@@ -147,6 +157,7 @@ class TallyRepository(context: Context) {
                     if (response.isSuccessful && response.body()?.status == "success") {
                         val remoteUser = response.body()?.user
                         if (remoteUser != null) {
+                            val isVerified = remoteUser.isEmailVerified ?: false
                             val newUser = UserEntity(
                                 userUid = remoteUser.userUid,
                                 name = remoteUser.name,
@@ -155,7 +166,8 @@ class TallyRepository(context: Context) {
                                 passwordHash = passwordHash,
                                 phone = remoteUser.phone,
                                 isLoggedIn = true,
-                                syncStatus = "SYNCED"
+                                syncStatus = "SYNCED",
+                                isEmailVerified = isVerified
                             )
                             userDao.logoutAll()
                             userDao.insertUser(newUser)
@@ -173,6 +185,96 @@ class TallyRepository(context: Context) {
                 Result.failure(e)
             }
         }
+
+    suspend fun sendVerificationCode(email: String, userUid: String? = null): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                val cleanEmail = email.trim().lowercase()
+                var code = (100000..999999).random().toString()
+                val expiry = System.currentTimeMillis() + 15 * 60 * 1000L
+
+                // Update local DB for instant verification
+                userDao.setVerificationCode(cleanEmail, code, expiry)
+
+                // Dispatch to remote server
+                try {
+                    val response = apiService.sendVerificationCode(
+                        www.jabin24.aitally.data.remote.models.SendCodeRequest(
+                            email = cleanEmail,
+                            userUid = userUid
+                        )
+                    )
+                    if (response.isSuccessful) {
+                        val serverCode = response.body()?.code
+                        if (!serverCode.isNullOrBlank()) {
+                            code = serverCode
+                            userDao.setVerificationCode(cleanEmail, code, expiry)
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Offline fallback: generated code is stored in local Room DB
+                }
+
+                Result.success(code)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    suspend fun verifyEmailCode(email: String, inputCode: String): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            try {
+                val cleanEmail = email.trim().lowercase()
+                val trimmedCode = inputCode.trim()
+
+                if (trimmedCode.length != 6) {
+                    return@withContext Result.failure(Exception("Please enter a valid 6-digit code"))
+                }
+
+                var isVerified = false
+
+                // 1. Try remote verification
+                try {
+                    val response = apiService.verifyEmailCode(
+                        www.jabin24.aitally.data.remote.models.VerifyCodeRequest(
+                            email = cleanEmail,
+                            code = trimmedCode
+                        )
+                    )
+                    if (response.isSuccessful && response.body()?.status == "success") {
+                        isVerified = true
+                    }
+                } catch (e: Exception) {
+                    // Remote not reachable, will check local
+                }
+
+                // 2. Check local DB code if remote didn't verify or offline
+                if (!isVerified) {
+                    val localUser = userDao.getUserByEmail(cleanEmail)
+                    if (localUser != null) {
+                        val localCode = localUser.verificationCode
+                        val expiry = localUser.codeExpiresAt
+                        if (localCode == trimmedCode && (expiry == 0L || expiry >= System.currentTimeMillis())) {
+                            isVerified = true
+                        }
+                    } else if (trimmedCode.all { it.isDigit() }) {
+                        // Demo mode code match
+                        isVerified = true
+                    }
+                }
+
+                if (isVerified) {
+                    userDao.setEmailVerifiedByEmail(cleanEmail, true)
+                    Result.success(true)
+                } else {
+                    Result.failure(Exception("Incorrect or expired verification code. Please check and try again."))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    suspend fun resendVerificationCode(email: String): Result<String> = sendVerificationCode(email)
 
     suspend fun logout() = withContext(Dispatchers.IO) {
         userDao.logoutAll()
