@@ -1,0 +1,6 @@
+{
+  "name": "TallyKhata",
+  "description": "Smart credit ledger (Khata) app for customers and businesses with end-to-end encryption, offline synchronization with jabin24.com, and SMS payment reminders.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
