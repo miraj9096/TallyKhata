@@ -389,7 +389,7 @@ fun DashboardScreen(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = onSearchChange,
-                        placeholder = { Text("Search by customer name or phone...") },
+                        placeholder = { Text("Search customer") },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
@@ -423,7 +423,7 @@ fun DashboardScreen(
                         )
 
                         Text(
-                            text = "Tap customer for details",
+                            text = "Tap to details",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline
                         )
