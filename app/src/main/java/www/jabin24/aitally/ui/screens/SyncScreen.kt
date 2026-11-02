@@ -76,6 +76,8 @@ fun SyncScreen(
     pendingSyncCount: Int,
     isSyncing: Boolean,
     syncMessage: String?,
+    isOnline: Boolean = true,
+    lastParityReport: www.jabin24.aitally.data.repository.SyncParityReport? = null,
     onBack: () -> Unit,
     onSyncNow: () -> Unit
 ) {
@@ -130,6 +132,36 @@ fun SyncScreen(
                                 Column {
                                     Text("Cloud Sync Endpoint", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                     Text("https://jabin24.com/api/tally_sync.php", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+
+                        // Online Connectivity Indicator
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 10.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isOnline) TallyCashIn.copy(alpha = 0.12f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        if (isOnline) Icons.Default.Wifi else Icons.Default.WifiOff,
+                                        contentDescription = null,
+                                        tint = if (isOnline) TallyCashIn else MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        if (isOnline) "Device Online • Data Parity Ready" else "Device Offline • Local Room DB Active",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isOnline) TallyCashIn else MaterialTheme.colorScheme.error
+                                    )
                                 }
                             }
                         }
@@ -213,6 +245,51 @@ fun SyncScreen(
                                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Sync Now / এখনই সিঙ্ক করুন", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Data Parity Report Card
+            if (lastParityReport != null) {
+                item {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        shape = RoundedCornerShape(14.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.CloudDone, contentDescription = null, tint = TallyCashIn)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Data Parity Metrics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(lastParityReport.statusMessage, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Pushed Transactions to Cloud:", style = MaterialTheme.typography.bodySmall)
+                                Text("${lastParityReport.pushedTransactionsCount}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Pulled Transactions from Cloud:", style = MaterialTheme.typography.bodySmall)
+                                Text("${lastParityReport.pulledTransactionsCount}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Total Local Room Transactions:", style = MaterialTheme.typography.bodySmall)
+                                Text("${lastParityReport.totalLocalTransactions}", fontWeight = FontWeight.Bold, color = TallyPrimary, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }

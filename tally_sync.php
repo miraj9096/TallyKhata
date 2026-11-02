@@ -87,7 +87,7 @@ function logSyncAction($pdo, $userUid, $entityType, $entityUid, $syncAction) {
 switch ($action) {
 
     // ----------------------------------------------------------
-    // ACTION: REGISTER USER
+    // ACTION: REGISTER USER (Sign Up)
     // ----------------------------------------------------------
     case 'register':
         $userUid      = trim($requestData['user_uid'] ?? '');
@@ -108,59 +108,149 @@ switch ($action) {
         }
 
         try {
-            // Check if user already exists
-            $checkStmt = $pdo->prepare("SELECT user_uid, email FROM users WHERE email = ? LIMIT 1");
+            // Check if email already registered
+            $checkStmt = $pdo->prepare("SELECT user_uid, email, is_email_verified FROM users WHERE email = ? LIMIT 1");
             $checkStmt->execute([$email]);
             $existing = $checkStmt->fetch();
 
+            $verifyCode = sprintf("%06d", mt_rand(100000, 999999));
+
             if ($existing) {
-                // Update profile info if same email
+                // If unverified, update details and new OTP code
                 $updateStmt = $pdo->prepare("
                     UPDATE users 
-                    SET name = ?, shop_name = ?, phone = ?, password_hash = ?, updated_at = NOW()
+                    SET name = ?, shop_name = ?, phone = ?, password_hash = ?, 
+                        verification_code = ?, code_expires_at = DATE_ADD(NOW(), INTERVAL 15 MINUTE), 
+                        is_email_verified = 0, updated_at = NOW()
                     WHERE email = ?
                 ");
-                $updateStmt->execute([$name, $shopName, $phone, $passwordHash, $email]);
+                $updateStmt->execute([$name, $shopName, $phone, $passwordHash, $verifyCode, $email]);
                 $returnUid = $existing['user_uid'];
             } else {
-                // Insert new account
+                // Insert new user record in MySQL
                 $insertStmt = $pdo->prepare("
-                    INSERT INTO users (user_uid, name, shop_name, email, password_hash, phone, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    INSERT INTO users (user_uid, name, shop_name, email, password_hash, phone, is_email_verified, verification_code, code_expires_at, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 0, ?, DATE_ADD(NOW(), INTERVAL 15 MINUTE), NOW(), NOW())
                 ");
-                $insertStmt->execute([$userUid, $name, $shopName, $email, $passwordHash, $phone]);
+                $insertStmt->execute([$userUid, $name, $shopName, $email, $passwordHash, $phone, $verifyCode]);
                 $returnUid = $userUid;
             }
 
             logSyncAction($pdo, $returnUid, 'USER', $returnUid, 'REGISTER');
 
-            // Automatically generate verification code upon registration
-            $verifyCode = sprintf("%06d", mt_rand(100000, 999999));
-            try {
-                $codeStmt = $pdo->prepare("
-                    UPDATE users 
-                    SET verification_code = ?, code_expires_at = DATE_ADD(NOW(), INTERVAL 15 MINUTE)
-                    WHERE email = ?
-                ");
-                $codeStmt->execute([$verifyCode, $email]);
-            } catch (Exception $ce) {}
+            // Send verification email via PHP mail()
+            $subject = "TallyKhata Verification Code: {$verifyCode}";
+            $body = "Dear {$name},\n\nThank you for signing up on TallyKhata (ডিজিটাল হিসাব খাতা)!\n\nYour 6-digit email verification OTP code is: {$verifyCode}\n\nPlease enter this code in the app to verify your email and activate your ledger account.\nThis verification code will expire in 15 minutes.\n\nThank you,\nTallyKhata Security Team\njabin24.com";
+            $headers = "From: no-reply@jabin24.com\r\nReply-To: support@jabin24.com\r\nX-Mailer: PHP/" . phpversion();
+            @mail($email, $subject, $body, $headers);
 
             echo json_encode([
-                'status'    => 'success',
-                'message'   => 'User account registered and synchronized successfully. Verification code sent.',
-                'user_uid'  => $returnUid,
-                'email'     => $email,
-                'code'      => $verifyCode,
-                'is_email_verified' => false
+                'status'            => 'success',
+                'message'           => 'Account registered in MySQL. Verification code sent to ' . $email . '.',
+                'user_uid'          => $returnUid,
+                'email'             => $email,
+                'code'              => $verifyCode, // Returned for instant verification & development preview
+                'is_email_verified' => false,
+                'user'              => [
+                    'user_uid'          => $returnUid,
+                    'name'              => $name,
+                    'shop_name'         => $shopName,
+                    'email'             => $email,
+                    'phone'             => $phone,
+                    'is_email_verified' => false
+                ]
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'Registration error: ' . $e->getMessage()]);
+            echo json_encode(['status' => 'error', 'message' => 'Registration database error: ' . $e->getMessage()]);
         }
         break;
 
     // ----------------------------------------------------------
-    // ACTION: SEND EMAIL VERIFICATION CODE
+    // ACTION: LOGIN USER (Sign In)
+    // ----------------------------------------------------------
+    case 'login':
+        $email        = strtolower(trim($requestData['email'] ?? ''));
+        $passwordHash = trim($requestData['password_hash'] ?? '');
+
+        if (empty($email) || empty($passwordHash)) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Email and password are required.']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("
+                SELECT user_uid, name, shop_name, email, phone, password_hash, is_email_verified, verification_code, code_expires_at 
+                FROM users 
+                WHERE email = ? 
+                LIMIT 1
+            ");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
+
+            if ($user && ($user['password_hash'] === $passwordHash)) {
+                $isVerified = (int)($user['is_email_verified'] ?? 0) === 1;
+
+                if (!$isVerified) {
+                    // Generate new 6-digit code if none or expired
+                    $code = $user['verification_code'];
+                    if (empty($code) || strtotime($user['code_expires_at'] ?? 'now') < time()) {
+                        $code = sprintf("%06d", mt_rand(100000, 999999));
+                        $upStmt = $pdo->prepare("
+                            UPDATE users 
+                            SET verification_code = ?, code_expires_at = DATE_ADD(NOW(), INTERVAL 15 MINUTE) 
+                            WHERE email = ?
+                        ");
+                        $upStmt->execute([$code, $email]);
+
+                        $subject = "TallyKhata Verification Code: {$code}";
+                        $body = "Dear {$user['name']},\n\nYour 6-digit email verification code is: {$code}\n\nThank you,\nTallyKhata Security Team";
+                        $headers = "From: no-reply@jabin24.com\r\nReply-To: support@jabin24.com\r\nX-Mailer: PHP/" . phpversion();
+                        @mail($email, $subject, $body, $headers);
+                    }
+
+                    echo json_encode([
+                        'status'            => 'unverified',
+                        'message'           => 'Please verify your email with the 6-digit code sent to ' . $email . '.',
+                        'email'             => $email,
+                        'code'              => $code,
+                        'is_email_verified' => false,
+                        'user'              => [
+                            'user_uid'          => $user['user_uid'],
+                            'name'              => $user['name'],
+                            'shop_name'         => $user['shop_name'],
+                            'email'             => $user['email'],
+                            'phone'             => $user['phone'],
+                            'is_email_verified' => false
+                        ]
+                    ]);
+                    exit;
+                }
+
+                // Authentication passed & Email verified
+                unset($user['password_hash']);
+                $user['is_email_verified'] = true;
+                logSyncAction($pdo, $user['user_uid'], 'USER', $user['user_uid'], 'LOGIN');
+
+                echo json_encode([
+                    'status'            => 'success',
+                    'message'           => 'Authentication successful.',
+                    'is_email_verified' => true,
+                    'user'              => $user
+                ]);
+            } else {
+                http_response_code(401);
+                echo json_encode(['status' => 'error', 'message' => 'Invalid email or password. Please try again.']);
+            }
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Login error: ' . $e->getMessage()]);
+        }
+        break;
+
+    // ----------------------------------------------------------
+    // ACTION: SEND VERIFICATION CODE
     // ----------------------------------------------------------
     case 'send_verification_code':
         $email   = strtolower(trim($requestData['email'] ?? ''));
@@ -172,11 +262,9 @@ switch ($action) {
             exit;
         }
 
-        // Generate 6-digit numeric verification code
         $code = sprintf("%06d", mt_rand(100000, 999999));
 
         try {
-            // Save verification code with 15-minute expiration
             $updateCodeStmt = $pdo->prepare("
                 UPDATE users 
                 SET verification_code = ?, code_expires_at = DATE_ADD(NOW(), INTERVAL 15 MINUTE)
@@ -184,25 +272,23 @@ switch ($action) {
             ");
             $updateCodeStmt->execute([$code, $email]);
 
-            // Attempt to send email via standard PHP mail()
-            $subject = "TallyKhata Verification Code: {$code}";
-            $body = "Dear TallyKhata User,\n\nYour email verification code is: {$code}\n\nThis code will expire in 15 minutes.\nIf you did not request this, please ignore this email.\n\nThank you,\nTallyKhata Security Team (jabin24.com)";
+            $subject = "TallyKhata Email Verification Code: {$code}";
+            $body = "Dear TallyKhata User,\n\nYour 6-digit email verification code is: {$code}\n\nThis code will expire in 15 minutes.\n\nThank you,\nTallyKhata Security Team";
             $headers = "From: no-reply@jabin24.com\r\nReply-To: support@jabin24.com\r\nX-Mailer: PHP/" . phpversion();
             @mail($email, $subject, $body, $headers);
 
-            logSyncAction($pdo, $userUid ?: 'email:' . $email, 'AUTH', $email, 'SEND_VERIFY_CODE');
+            logSyncAction($pdo, $userUid ?: 'email:' . $email, 'AUTH', $email, 'SEND_CODE');
 
             echo json_encode([
                 'status'  => 'success',
-                'message' => "Verification code sent to {$email}. Please check your inbox and spam folder.",
+                'message' => "Verification code sent to {$email}.",
                 'email'   => $email,
-                'code'    => $code // Returned for testing & instant preview verification
+                'code'    => $code
             ]);
         } catch (PDOException $e) {
-            // Even if DB error, return code for offline fallback
             echo json_encode([
                 'status'  => 'success',
-                'message' => "Verification code generated for {$email}.",
+                'message' => "Verification code generated.",
                 'email'   => $email,
                 'code'    => $code
             ]);
@@ -218,22 +304,22 @@ switch ($action) {
 
         if (empty($email) || empty($code)) {
             http_response_code(400);
-            echo json_encode(['status' => 'error', 'message' => 'Email and 6-digit verification code are required.']);
+            echo json_encode(['status' => 'error', 'message' => 'Email and 6-digit code are required.']);
             exit;
         }
 
         try {
-            $checkStmt = $pdo->prepare("
-                SELECT user_uid, email, verification_code, code_expires_at
+            $stmt = $pdo->prepare("
+                SELECT user_uid, name, shop_name, email, phone, verification_code, code_expires_at 
                 FROM users 
-                WHERE email = ?
+                WHERE email = ? 
                 LIMIT 1
             ");
-            $checkStmt->execute([$email]);
-            $userData = $checkStmt->fetch();
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
 
-            if (!$userData) {
-                // If user not yet in remote DB, accept code if valid 6 digits format
+            if (!$user) {
+                // If user not in database yet, accept if 6 numeric digits
                 if (strlen($code) == 6 && ctype_digit($code)) {
                     echo json_encode([
                         'status'            => 'success',
@@ -241,82 +327,48 @@ switch ($action) {
                         'is_email_verified' => true
                     ]);
                     exit;
-                } else {
-                    http_response_code(400);
-                    echo json_encode(['status' => 'error', 'message' => 'Invalid verification code.']);
-                    exit;
                 }
+                http_response_code(404);
+                echo json_encode(['status' => 'error', 'message' => 'No account found with this email.']);
+                exit;
             }
 
-            // Check if code matches and not expired
-            if ($userData['verification_code'] === $code) {
-                $expiry = strtotime($userData['code_expires_at'] ?? '2000-01-01');
-                if (time() > $expiry) {
-                    http_response_code(400);
-                    echo json_encode(['status' => 'error', 'message' => 'Verification code has expired. Please request a new code.']);
-                    exit;
-                }
+            $savedCode = trim($user['verification_code'] ?? '');
+            $expiresAt = strtotime($user['code_expires_at'] ?? 'now');
 
-                // Code matched and is active!
-                $confirmStmt = $pdo->prepare("
-                    UPDATE users
-                    SET is_email_verified = 1, verification_code = NULL, code_expires_at = NULL, updated_at = NOW()
+            if ($savedCode === $code && $expiresAt >= time()) {
+                // Mark verified in MySQL database
+                $markStmt = $pdo->prepare("
+                    UPDATE users 
+                    SET is_email_verified = 1, verification_code = NULL, code_expires_at = NULL, updated_at = NOW() 
                     WHERE email = ?
                 ");
-                $confirmStmt->execute([$email]);
+                $markStmt->execute([$email]);
 
-                logSyncAction($pdo, $userData['user_uid'], 'USER', $userData['user_uid'], 'EMAIL_VERIFIED');
+                logSyncAction($pdo, $user['user_uid'], 'USER', $email, 'EMAIL_VERIFIED');
 
                 echo json_encode([
                     'status'            => 'success',
-                    'message'           => 'Email successfully verified! Your TallyKhata account is now authenticated.',
-                    'is_email_verified' => true
+                    'message'           => 'Email verified successfully! Account is now active.',
+                    'email'             => $email,
+                    'user_uid'          => $user['user_uid'],
+                    'is_email_verified' => true,
+                    'user'              => [
+                        'user_uid'          => $user['user_uid'],
+                        'name'              => $user['name'],
+                        'shop_name'         => $user['shop_name'],
+                        'email'             => $user['email'],
+                        'phone'             => $user['phone'],
+                        'is_email_verified' => true
+                    ]
                 ]);
             } else {
                 http_response_code(400);
-                echo json_encode(['status' => 'error', 'message' => 'Incorrect verification code. Please check and try again.']);
+                echo json_encode(['status' => 'error', 'message' => 'Invalid or expired 6-digit verification code. Please check and try again.']);
             }
         } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'Verification error: ' . $e->getMessage()]);
-        }
-        break;
-
-    // ----------------------------------------------------------
-    // ACTION: LOGIN USER
-    // ----------------------------------------------------------
-    case 'login':
-        $email        = strtolower(trim($requestData['email'] ?? ''));
-        $passwordHash = trim($requestData['password_hash'] ?? '');
-
-        if (empty($email) || empty($passwordHash)) {
-            http_response_code(400);
-            echo json_encode(['status' => 'error', 'message' => 'Email and password are required.']);
-            exit;
-        }
-
-        try {
-            $stmt = $pdo->prepare("SELECT user_uid, name, shop_name, email, phone, password_hash FROM users WHERE email = ? LIMIT 1");
-            $stmt->execute([$email]);
-            $user = $stmt->fetch();
-
-            if ($user && ($user['password_hash'] === $passwordHash)) {
-                // Authentication passed
-                unset($user['password_hash']); // Do not expose password hash in response
-                logSyncAction($pdo, $user['user_uid'], 'USER', $user['user_uid'], 'LOGIN');
-
-                echo json_encode([
-                    'status'  => 'success',
-                    'message' => 'Authentication successful.',
-                    'user'    => $user
-                ]);
-            } else {
-                http_response_code(401);
-                echo json_encode(['status' => 'error', 'message' => 'Invalid email or password.']);
-            }
-        } catch (PDOException $e) {
-            http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'Login error: ' . $e->getMessage()]);
+            echo json_encode(['status' => 'error', 'message' => 'Database verification error: ' . $e->getMessage()]);
         }
         break;
 

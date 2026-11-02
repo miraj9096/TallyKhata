@@ -3,6 +3,7 @@ package www.jabin24.aitally.data.repository
 import android.content.Context
 import www.jabin24.aitally.data.crypto.CryptoManager
 import www.jabin24.aitally.data.local.TallyDatabase
+import www.jabin24.aitally.data.local.entity.CreditLedgerEntryEntity
 import www.jabin24.aitally.data.local.entity.CustomerEntity
 import www.jabin24.aitally.data.local.entity.SyncQueueEntity
 import www.jabin24.aitally.data.local.entity.TransactionEntity
@@ -29,11 +30,20 @@ class TallyRepository(context: Context) {
     private val userDao = db.userDao()
     private val customerDao = db.customerDao()
     private val transactionDao = db.transactionDao()
+    private val creditLedgerDao = db.creditLedgerEntryDao()
     private val syncQueueDao = db.syncQueueDao()
     private val apiService = RetrofitClient.apiService
+    val syncRepository = TallySyncRepository(context, db, apiService)
 
     val activeUserFlow: Flow<UserEntity?> = userDao.getActiveUserFlow()
     val pendingSyncCountFlow: Flow<Int> = syncQueueDao.getPendingCountFlow()
+
+    fun getAllCreditLedgerEntriesFlow(userUid: String): Flow<List<CreditLedgerEntryEntity>> =
+        creditLedgerDao.getAllEntriesFlow(userUid)
+
+    fun getCustomerCreditLedgerEntriesFlow(customerUid: String): Flow<List<CreditLedgerEntryEntity>> =
+        creditLedgerDao.getEntriesForCustomerFlow(customerUid)
+
 
     fun getCustomersFlow(userUid: String): Flow<List<CustomerEntity>> =
         customerDao.getCustomersFlow(userUid)
@@ -74,14 +84,14 @@ class TallyRepository(context: Context) {
                 email = email.trim().lowercase(),
                 passwordHash = passwordHash,
                 phone = phone.trim(),
-                isLoggedIn = true,
+                isLoggedIn = true, // Active session awaiting email verification
                 syncStatus = "PENDING",
                 isEmailVerified = false,
                 verificationCode = initialVerifyCode,
                 codeExpiresAt = expiry
             )
 
-            // Logout previous users and save local
+            // Save user in local DB as active session awaiting verification
             userDao.logoutAll()
             userDao.insertUser(user)
 
@@ -95,7 +105,7 @@ class TallyRepository(context: Context) {
                 )
             )
 
-            // Try registering remotely on jabin24.com/api/tally_sync.php
+            // Try registering remotely on MySQL backend (jabin24.com/api/tally_sync.php)
             try {
                 val response = apiService.registerUser(
                     RegisterRequest(
@@ -107,8 +117,9 @@ class TallyRepository(context: Context) {
                         phone = user.phone
                     )
                 )
-                if (response.isSuccessful && response.body()?.status == "success") {
-                    val serverCode = response.body()?.code
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    val serverCode = body?.code
                     if (!serverCode.isNullOrBlank()) {
                         user = user.copy(verificationCode = serverCode)
                     }
@@ -116,10 +127,10 @@ class TallyRepository(context: Context) {
                     syncQueueDao.dequeueByUid(userUid)
                 }
             } catch (e: Exception) {
-                // Network unavailable or server offline; user is stored safely offline
+                // Network unavailable; user is stored safely offline with initialVerifyCode
             }
 
-            // Seed initial demo data for new store if first time
+            // Seed initial demo data for store
             seedSampleKhataIfEmpty(userUid)
 
             Result.success(user)
@@ -140,6 +151,11 @@ class TallyRepository(context: Context) {
                     if (localUser.passwordHash == passwordHash) {
                         userDao.logoutAll()
                         userDao.setLoggedIn(localUser.userUid)
+                        if (!localUser.isEmailVerified) {
+                            // User credentials correct, activate session to show EmailVerificationGateScreen
+                            sendVerificationCode(cleanEmail, localUser.userUid)
+                            return@withContext Result.success(localUser.copy(isLoggedIn = true, isEmailVerified = false))
+                        }
                         return@withContext Result.success(localUser.copy(isLoggedIn = true))
                     } else {
                         return@withContext Result.failure(Exception("Incorrect password"))
@@ -154,26 +170,55 @@ class TallyRepository(context: Context) {
                             passwordHash = passwordHash
                         )
                     )
-                    if (response.isSuccessful && response.body()?.status == "success") {
-                        val remoteUser = response.body()?.user
-                        if (remoteUser != null) {
-                            val isVerified = remoteUser.isEmailVerified ?: false
-                            val newUser = UserEntity(
-                                userUid = remoteUser.userUid,
-                                name = remoteUser.name,
-                                shopName = remoteUser.shopName,
-                                email = remoteUser.email,
+                    if (response.isSuccessful) {
+                        val body = response.body()
+                        if (body?.status == "unverified") {
+                            val code = body.code
+                            val remoteUser = body.user
+                            val userUid = remoteUser?.userUid ?: ("usr_" + UUID.randomUUID().toString().replace("-", "").take(12))
+                            val unverifiedUser = UserEntity(
+                                userUid = userUid,
+                                name = remoteUser?.name ?: "Merchant",
+                                shopName = remoteUser?.shopName ?: "",
+                                email = cleanEmail,
                                 passwordHash = passwordHash,
-                                phone = remoteUser.phone,
+                                phone = remoteUser?.phone ?: "",
                                 isLoggedIn = true,
                                 syncStatus = "SYNCED",
-                                isEmailVerified = isVerified
+                                isEmailVerified = false,
+                                verificationCode = code,
+                                codeExpiresAt = System.currentTimeMillis() + 15 * 60 * 1000L
                             )
                             userDao.logoutAll()
-                            userDao.insertUser(newUser)
-                            // Pull user's transactions
-                            pullRemoteData(newUser.userUid)
-                            return@withContext Result.success(newUser)
+                            userDao.insertUser(unverifiedUser)
+                            userDao.setLoggedIn(unverifiedUser.userUid)
+                            return@withContext Result.success(unverifiedUser)
+                        } else if (body?.status == "success") {
+                            val remoteUser = body.user
+                            if (remoteUser != null) {
+                                val isVerified = remoteUser.isEmailVerified ?: false
+                                val newUser = UserEntity(
+                                    userUid = remoteUser.userUid,
+                                    name = remoteUser.name,
+                                    shopName = remoteUser.shopName,
+                                    email = remoteUser.email,
+                                    passwordHash = passwordHash,
+                                    phone = remoteUser.phone,
+                                    isLoggedIn = true,
+                                    syncStatus = "SYNCED",
+                                    isEmailVerified = isVerified
+                                )
+                                userDao.logoutAll()
+                                userDao.insertUser(newUser)
+                                userDao.setLoggedIn(newUser.userUid)
+                                if (!isVerified) {
+                                    sendVerificationCode(cleanEmail, newUser.userUid)
+                                    return@withContext Result.success(newUser)
+                                }
+                                // Pull user's transactions
+                                pullRemoteData(newUser.userUid)
+                                return@withContext Result.success(newUser)
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -265,6 +310,11 @@ class TallyRepository(context: Context) {
 
                 if (isVerified) {
                     userDao.setEmailVerifiedByEmail(cleanEmail, true)
+                    val localUser = userDao.getUserByEmail(cleanEmail)
+                    if (localUser != null) {
+                        userDao.logoutAll()
+                        userDao.setLoggedIn(localUser.userUid)
+                    }
                     Result.success(true)
                 } else {
                     Result.failure(Exception("Incorrect or expired verification code. Please check and try again."))
@@ -363,10 +413,6 @@ class TallyRepository(context: Context) {
         }
     }
 
-    suspend fun getActiveUser(): UserEntity? = withContext(Dispatchers.IO) {
-        userDao.getActiveUser()
-    }
-
     // ==========================================
     // CUSTOMERS & LEDGER
     // ==========================================
@@ -409,6 +455,21 @@ class TallyRepository(context: Context) {
                     syncStatus = "PENDING_INSERT"
                 )
                 transactionDao.insertTransaction(tx)
+                val ledgerEntry = CreditLedgerEntryEntity(
+                    entryId = tx.transactionUid,
+                    userUid = userUid,
+                    customerUid = customerUid,
+                    customerName = customer.name,
+                    customerPhone = customer.phone,
+                    entryType = CreditLedgerEntryEntity.ENTRY_TYPE_CREDIT,
+                    amount = initialDue,
+                    balanceAfter = initialDue,
+                    description = "Previous Opening Balance (পূর্বের বাকি)",
+                    createdAtMillis = System.currentTimeMillis(),
+                    receiptNumber = tx.receiptNumber,
+                    syncStatus = "PENDING_INSERT"
+                )
+                creditLedgerDao.insertEntry(ledgerEntry)
             }
 
             syncQueueDao.enqueue(
@@ -446,6 +507,7 @@ class TallyRepository(context: Context) {
 
     suspend fun deleteCustomer(customerUid: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            creditLedgerDao.deleteEntriesForCustomer(customerUid)
             transactionDao.deleteTransactionsForCustomer(customerUid)
             customerDao.deleteCustomerByUid(customerUid)
             syncQueueDao.enqueue(
@@ -503,6 +565,25 @@ class TallyRepository(context: Context) {
             }
 
             transactionDao.insertTransaction(transaction)
+
+            // Store in Room credit_ledger_entries for dedicated offline credit access
+            val ledgerEntry = CreditLedgerEntryEntity(
+                entryId = txUid,
+                userUid = userUid,
+                customerUid = customerUid,
+                customerName = customer.name,
+                customerPhone = customer.phone,
+                entryType = type,
+                amount = amount,
+                balanceAfter = newDue,
+                description = details,
+                dueDateMillis = dueDateMillis,
+                createdAtMillis = transaction.dateMillis,
+                receiptNumber = receiptNumber,
+                syncStatus = "PENDING_INSERT"
+            )
+            creditLedgerDao.insertEntry(ledgerEntry)
+
             customerDao.updateCustomerDue(customerUid, newDue, System.currentTimeMillis())
 
             syncQueueDao.enqueue(
@@ -533,6 +614,7 @@ class TallyRepository(context: Context) {
                     customerDao.updateCustomerDue(customer.customerUid, reversedDue, System.currentTimeMillis())
                 }
 
+                creditLedgerDao.deleteEntryById(transaction.transactionUid)
                 transactionDao.deleteTransactionByUid(transaction.transactionUid)
                 syncQueueDao.enqueue(
                     SyncQueueEntity(
@@ -553,79 +635,23 @@ class TallyRepository(context: Context) {
     // ==========================================
 
     suspend fun syncWithServer(userUid: String): SyncResult = withContext(Dispatchers.IO) {
-        try {
-            val pendingCount = syncQueueDao.getAllPending().size
-            val localCustomers = customerDao.getCustomers(userUid)
-            val localTransactions = transactionDao.getAllTransactions(userUid)
-
-            val customerDtos = localCustomers.map { c ->
-                CustomerDto(
-                    customerUid = c.customerUid,
-                    userUid = c.userUid,
-                    name = c.name,
-                    phone = c.phone,
-                    address = c.address,
-                    encryptedNote = c.encryptedNote,
-                    totalDue = c.totalDue
-                )
-            }
-
-            val transactionDtos = localTransactions.map { t ->
-                TransactionDto(
-                    transactionUid = t.transactionUid,
-                    customerUid = t.customerUid,
-                    userUid = t.userUid,
-                    type = t.type,
-                    amount = t.amount,
-                    encryptedDetails = t.encryptedDetails,
-                    dateMillis = t.dateMillis,
-                    dueDateMillis = t.dueDateMillis,
-                    receiptNumber = t.receiptNumber
-                )
-            }
-
-            val request = SyncPushRequest(
-                action = "sync",
-                userUid = userUid,
-                customers = customerDtos,
-                transactions = transactionDtos
+        val report = syncRepository.synchronizeTransactions(userUid)
+        if (report.isSuccess) {
+            SyncResult.Success(
+                message = report.statusMessage,
+                count = report.pushedTransactionsCount + report.pulledTransactionsCount,
+                timestamp = report.syncedAt
             )
-
-            val response = try {
-                apiService.pushSync(request)
-            } catch (e: Exception) {
-                // Server unavailable or offline -> report graceful offline queue status
-                return@withContext SyncResult.Offline(
-                    message = "Offline Mode: All ${customerDtos.size} customers & ${transactionDtos.size} records are securely saved on your device. ($pendingCount updates pending sync to jabin24.com)",
-                    pendingCount = pendingCount
-                )
-            }
-
-            if (response.isSuccessful && response.body()?.status == "success") {
-                // Clear pending sync queue
-                syncQueueDao.clearAll()
-                // Update local entities sync status
-                localCustomers.forEach { customerDao.updateCustomer(it.copy(syncStatus = "SYNCED")) }
-
-                val itemsSynced = response.body()?.itemsSynced ?: (customerDtos.size + transactionDtos.size)
-                SyncResult.Success(
-                    message = "Successfully synchronized $itemsSynced items with jabin24.com database.",
-                    count = itemsSynced,
-                    timestamp = System.currentTimeMillis()
-                )
-            } else {
-                SyncResult.Offline(
-                    message = "Working in Offline Mode. Local database active with $pendingCount pending queue items.",
-                    pendingCount = pendingCount
-                )
-            }
-        } catch (e: Exception) {
-            val pending = syncQueueDao.getAllPending().size
+        } else {
             SyncResult.Offline(
-                message = "Device is offline or jabin24.com is unreachable. Data is completely safe in local encrypted storage.",
-                pendingCount = pending
+                message = report.statusMessage,
+                pendingCount = report.pendingQueueRemaining
             )
         }
+    }
+
+    suspend fun synchronizeWithParity(userUid: String): SyncParityReport = withContext(Dispatchers.IO) {
+        syncRepository.synchronizeTransactions(userUid)
     }
 
     private suspend fun pullRemoteData(userUid: String) {

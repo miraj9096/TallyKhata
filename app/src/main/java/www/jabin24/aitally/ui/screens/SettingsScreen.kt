@@ -97,34 +97,23 @@ fun SettingsScreen(
     smsSignature: String,
     onBack: () -> Unit,
     onUpdateProfile: (name: String, shop: String, phone: String) -> Unit,
-    onChangePassword: (oldPass: String, newPass: String) -> Unit,
     onSetDefaultSmsTemplate: (SmsHelper.TemplateType) -> Unit,
     onSetAutoSync: (Boolean) -> Unit,
     onSetPinLock: (Boolean) -> Unit,
     onSetSmsSignature: (String) -> Unit,
     onOpenSyncScreen: () -> Unit,
-    onVerifyEmailClick: (String) -> Unit = {},
-    onLogout: () -> Unit
+    onLogout: () -> Unit = {}
 ) {
     BackHandler { onBack() }
     val context = LocalContext.current
 
     var showEditProfileDialog by remember { mutableStateOf(false) }
-    var showChangePasswordDialog by remember { mutableStateOf(false) }
     var showLogoutConfirmDialog by remember { mutableStateOf(false) }
 
     // Edit Profile State
     var editName by remember(user) { mutableStateOf(user?.name ?: "") }
     var editShop by remember(user) { mutableStateOf(user?.shopName ?: "") }
     var editPhone by remember(user) { mutableStateOf(user?.phone ?: "") }
-
-    // Change Password State
-    var oldPassword by remember { mutableStateOf("") }
-    var newPassword by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    var passwordError by remember { mutableStateOf<String?>(null) }
-    var oldPassVisible by remember { mutableStateOf(false) }
-    var newPassVisible by remember { mutableStateOf(false) }
 
     // Edit Profile Dialog
     if (showEditProfileDialog) {
@@ -201,140 +190,12 @@ fun SettingsScreen(
         )
     }
 
-    // Change Password Dialog
-    if (showChangePasswordDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showChangePasswordDialog = false
-                passwordError = null
-            },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Key, contentDescription = null, tint = TallyPrimary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Change Account Password", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                }
-            },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    if (passwordError != null) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 10.dp)
-                        ) {
-                            Text(
-                                text = passwordError!!,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(8.dp)
-                            )
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = oldPassword,
-                        onValueChange = {
-                            oldPassword = it
-                            passwordError = null
-                        },
-                        label = { Text("Current Password *") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                        visualTransformation = if (oldPassVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { oldPassVisible = !oldPassVisible }) {
-                                Icon(
-                                    if (oldPassVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = null
-                                )
-                            }
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = newPassword,
-                        onValueChange = {
-                            newPassword = it
-                            passwordError = null
-                        },
-                        label = { Text("New Password (min 6 chars) *") },
-                        leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) },
-                        visualTransformation = if (newPassVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { newPassVisible = !newPassVisible }) {
-                                Icon(
-                                    if (newPassVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = null
-                                )
-                            }
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = confirmPassword,
-                        onValueChange = {
-                            confirmPassword = it
-                            passwordError = null
-                        },
-                        label = { Text("Confirm New Password *") },
-                        leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (oldPassword.isBlank()) {
-                            passwordError = "Enter current password"
-                            return@Button
-                        }
-                        if (newPassword.length < 6) {
-                            passwordError = "New password must be at least 6 characters"
-                            return@Button
-                        }
-                        if (newPassword != confirmPassword) {
-                            passwordError = "New passwords do not match"
-                            return@Button
-                        }
-                        onChangePassword(oldPassword, newPassword)
-                        showChangePasswordDialog = false
-                        oldPassword = ""
-                        newPassword = ""
-                        confirmPassword = ""
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = TallyPrimary),
-                    modifier = Modifier.testTag("confirm_change_password")
-                ) {
-                    Text("Update Password")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showChangePasswordDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
     // Logout Confirmation Dialog
     if (showLogoutConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutConfirmDialog = false },
-            title = { Text("Confirm Sign Out") },
-            text = { Text("Are you sure you want to sign out from TallyKhata? All your offline records are safely preserved in local database.") },
+            title = { Text("সাইন আউট নিশ্চিতকরণ (Confirm Sign Out)") },
+            text = { Text("আপনি কি ট্যালিখাতা থেকে সাইন আউট করতে চান? আপনার অফলাইন হিসাবসমূহ নিরাপদে সংরক্ষিত থাকবে।") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -343,12 +204,12 @@ fun SettingsScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Sign Out")
+                    Text("সাইন আউট (Sign Out)")
                 }
             },
             dismissButton = {
                 OutlinedButton(onClick = { showLogoutConfirmDialog = false }) {
-                    Text("Stay Signed In")
+                    Text("থাকুন (Stay)")
                 }
             }
         )
@@ -449,59 +310,6 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        // Email Verification Status Pill
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (user?.isEmailVerified == true) TallyCashIn.copy(alpha = 0.1f) else Color(0xFFFF9800).copy(alpha = 0.12f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = if (user?.isEmailVerified == true) Icons.Default.CheckCircle else Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = if (user?.isEmailVerified == true) TallyCashIn else Color(0xFFE65100),
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (user?.isEmailVerified == true) "Email Verified • ইমেইল যাচাইকৃত" else "Unverified • ইমেইল যাচাই করা হয়নি",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (user?.isEmailVerified == true) TallyCashIn else Color(0xFFE65100)
-                                    )
-                                }
-
-                                if (user?.isEmailVerified != true) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = TallyPrimary,
-                                        modifier = Modifier
-                                            .clickable { onVerifyEmailClick(user?.email ?: "") }
-                                            .testTag("verify_email_badge_button")
-                                    ) {
-                                        Text(
-                                            text = "Verify Code",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -557,33 +365,7 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Change Password Tile
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showChangePasswordDialog = true }
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Key, contentDescription = null, tint = TallyPrimary, modifier = Modifier.size(20.dp))
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text("Change Password", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                        Text("Update cloud login credentials", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = TallyPrimary)
-                            }
-                        }
 
-                        Spacer(modifier = Modifier.height(8.dp))
 
                         // E2EE Indicator Tile
                         Surface(
@@ -761,24 +543,58 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 6: Sign Out Button
+            // Section 6: Account Actions & Sign Out
             item {
-                OutlinedButton(
-                    onClick = { showLogoutConfirmDialog = true },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("logout_button")
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Sign Out of Account", fontWeight = FontWeight.Bold)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Account Session",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (user != null) "Logged in as ${user.email}" else "Not currently logged in",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = { showLogoutConfirmDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .testTag("logout_button")
+                        ) {
+                            Icon(
+                                Icons.Default.Logout,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "সাইন আউট (Sign Out)",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(20.dp))
             }
         }
     }
 }
+

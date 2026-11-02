@@ -52,11 +52,11 @@ import www.jabin24.aitally.data.local.entity.TransactionEntity
 import www.jabin24.aitally.ui.MainViewModel
 import www.jabin24.aitally.ui.components.AddCustomerDialog
 import www.jabin24.aitally.ui.components.AddTransactionDialog
-import www.jabin24.aitally.ui.components.EmailVerificationDialog
 import www.jabin24.aitally.ui.components.SmsReminderDialog
 import www.jabin24.aitally.ui.screens.AuthScreen
 import www.jabin24.aitally.ui.screens.CustomerDetailScreen
 import www.jabin24.aitally.ui.screens.DashboardScreen
+import www.jabin24.aitally.ui.screens.EmailVerificationGateScreen
 import www.jabin24.aitally.ui.screens.SettingsScreen
 import www.jabin24.aitally.ui.screens.SyncScreen
 import www.jabin24.aitally.ui.screens.TransactionsScreen
@@ -92,6 +92,11 @@ fun TallyKhataApp(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val activeUser by viewModel.activeUser.collectAsStateWithLifecycle()
+    val authError by viewModel.authError.collectAsStateWithLifecycle()
+    val isAuthLoading by viewModel.isAuthLoading.collectAsStateWithLifecycle()
+    val isVerifyingEmail by viewModel.isVerifyingEmail.collectAsStateWithLifecycle()
+    val verificationStatusMessage by viewModel.verificationStatusMessage.collectAsStateWithLifecycle()
+    val lastVerificationCode by viewModel.lastVerificationCode.collectAsStateWithLifecycle()
     val customers by viewModel.customers.collectAsStateWithLifecycle()
     val allTransactions by viewModel.allTransactions.collectAsStateWithLifecycle()
     val summary by viewModel.summary.collectAsStateWithLifecycle()
@@ -101,18 +106,12 @@ fun TallyKhataApp(
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-    val authError by viewModel.authError.collectAsStateWithLifecycle()
-    val isAuthLoading by viewModel.isAuthLoading.collectAsStateWithLifecycle()
     val defaultSmsTemplate by viewModel.defaultSmsTemplate.collectAsStateWithLifecycle()
     val autoSyncEnabled by viewModel.autoSyncEnabled.collectAsStateWithLifecycle()
     val pinLockEnabled by viewModel.pinLockEnabled.collectAsStateWithLifecycle()
     val smsSignature by viewModel.smsSignature.collectAsStateWithLifecycle()
-
-    val showVerificationDialog by viewModel.showVerificationDialog.collectAsStateWithLifecycle()
-    val isVerifyingEmail by viewModel.isVerifyingEmail.collectAsStateWithLifecycle()
-    val verificationStatusMessage by viewModel.verificationStatusMessage.collectAsStateWithLifecycle()
-    val lastVerificationCode by viewModel.lastVerificationCode.collectAsStateWithLifecycle()
-    val pendingVerificationEmail by viewModel.pendingVerificationEmail.collectAsStateWithLifecycle()
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
+    val lastSyncParityReport by viewModel.lastSyncParityReport.collectAsStateWithLifecycle()
 
     var currentTab by remember { mutableStateOf(NavigationTab.LEDGER) }
     var showAddCustomerDialog by remember { mutableStateOf(false) }
@@ -128,23 +127,6 @@ fun TallyKhataApp(
     }
 
     // Dialogs
-    if (showVerificationDialog) {
-        EmailVerificationDialog(
-            email = pendingVerificationEmail ?: activeUser?.email ?: "",
-            demoCode = lastVerificationCode,
-            isLoading = isVerifyingEmail,
-            statusMessage = verificationStatusMessage,
-            onDismiss = { viewModel.dismissEmailVerification() },
-            onVerify = { code ->
-                viewModel.verifyEmailCode(pendingVerificationEmail ?: activeUser?.email ?: "", code) {
-                    Toast.makeText(context, "Email verified successfully! / ইমেইল যাচাই সম্পন্ন", Toast.LENGTH_LONG).show()
-                }
-            },
-            onResend = {
-                viewModel.sendEmailVerificationCode(pendingVerificationEmail ?: activeUser?.email ?: "")
-            }
-        )
-    }
 
     if (showAddCustomerDialog) {
         AddCustomerDialog(
@@ -199,43 +181,46 @@ fun TallyKhataApp(
         )
     }
 
-    // Main App Flow
-    if (activeUser == null) {
-        // Authenticate user via Email/Password or Instant Offline Access
+    // Main App Flow: Authentication Gate -> Email Verification Gate -> Ledger / Scaffold
+    val user = activeUser
+    if (user == null) {
         AuthScreen(
-            isLoading = isAuthLoading || isVerifyingEmail,
+            isLoading = isAuthLoading,
             errorMessage = authError,
-            verificationStatusMessage = verificationStatusMessage,
-            lastGeneratedCode = lastVerificationCode,
-            onLogin = { email, pass ->
-                viewModel.login(email, pass)
+            onLogin = { email, password ->
+                viewModel.login(email, password)
             },
-            onRegister = { name, shop, email, pass, phone ->
-                viewModel.register(name, shop, email, pass, phone)
-            },
-            onSendVerificationCode = { email ->
-                viewModel.sendEmailVerificationCode(email)
-            },
-            onVerifyEmailCode = { email, code ->
-                viewModel.verifyEmailCode(email, code) {
-                    Toast.makeText(context, "Email verified successfully! / ইমেইল যাচাই সম্পন্ন", Toast.LENGTH_SHORT).show()
-                }
+            onRegister = { name, shopName, email, password, phone ->
+                viewModel.register(name, shopName, email, password, phone)
             },
             onOfflineDemoAccess = {
-                // Instant demo account in offline mode
                 viewModel.register(
-                    name = "Bismillah Store",
-                    shopName = "Bismillah General Store",
-                    email = "store@tallykhata.local",
-                    password = "password123",
+                    name = "Demo Merchant",
+                    shopName = "Demo Store",
+                    email = "demo@jabin24.com",
+                    password = "demopassword123",
                     phone = "01700000000"
                 )
             }
         )
-    } else {
-        // Customer Detail Subscreen
-        if (selectedCustomer != null) {
-            val customer = selectedCustomer!!
+    } else if (!user.isEmailVerified) {
+        EmailVerificationGateScreen(
+            user = user,
+            demoCode = lastVerificationCode ?: user.verificationCode,
+            isLoading = isVerifyingEmail,
+            statusMessage = verificationStatusMessage,
+            onVerify = { code ->
+                viewModel.verifyEmailCode(user.email, code)
+            },
+            onResend = {
+                viewModel.sendEmailVerificationCode(user.email)
+            },
+            onLogout = {
+                viewModel.logout()
+            }
+        )
+    } else if (selectedCustomer != null) {
+        val customer = selectedCustomer!!
             CustomerDetailScreen(
                 customer = customer,
                 transactions = selectedCustomerTransactions,
@@ -404,6 +389,8 @@ fun TallyKhataApp(
                                 pendingSyncCount = pendingSyncCount,
                                 isSyncing = isSyncing,
                                 syncMessage = syncMessage,
+                                isOnline = isOnline,
+                                lastParityReport = lastSyncParityReport,
                                 onBack = { currentTab = NavigationTab.LEDGER },
                                 onSyncNow = { viewModel.triggerSync() }
                             )
@@ -422,21 +409,14 @@ fun TallyKhataApp(
                                         if (msg != null) Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                                onChangePassword = { oldPass, newPass ->
-                                    viewModel.changePassword(oldPass, newPass) { _, msg ->
-                                        if (msg != null) Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                    }
-                                },
                                 onSetDefaultSmsTemplate = { viewModel.setDefaultSmsTemplate(it) },
                                 onSetAutoSync = { viewModel.setAutoSyncEnabled(it) },
                                 onSetPinLock = { viewModel.setPinLockEnabled(it) },
                                 onSetSmsSignature = { viewModel.setSmsSignature(it) },
                                 onOpenSyncScreen = { currentTab = NavigationTab.SYNC },
-                                onVerifyEmailClick = { email -> viewModel.openEmailVerification(email) },
                                 onLogout = { viewModel.logout() }
                             )
                         }
-                    }
                 }
             }
         }

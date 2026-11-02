@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import www.jabin24.aitally.data.local.entity.CustomerEntity
+import www.jabin24.aitally.service.PaymentReminderService
 import www.jabin24.aitally.ui.theme.TallyCashOut
 import www.jabin24.aitally.ui.theme.TallyPrimary
 import www.jabin24.aitally.util.SmsHelper
@@ -76,10 +77,15 @@ fun SmsReminderDialog(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            val result = SmsHelper.sendDirectSms(context, customer.phone, messageText)
+            val result = PaymentReminderService.sendPaymentReminder(
+                context = context,
+                customer = customer,
+                shopName = shopName,
+                templateType = selectedTemplate
+            )
             result.onSuccess {
                 Toast.makeText(context, "SMS sent to ${customer.phone}", Toast.LENGTH_LONG).show()
-                onDirectSmsSent("SMS sent successfully")
+                onDirectSmsSent("SMS sent successfully via SmsManager")
                 onDismiss()
             }.onFailure {
                 // Fallback to launching messaging app
@@ -263,11 +269,16 @@ fun SmsReminderDialog(
             Button(
                 onClick = {
                     if (useDirectSms) {
-                        if (SmsHelper.hasSmsPermission(context)) {
-                            val res = SmsHelper.sendDirectSms(context, customer.phone, messageText)
+                        if (PaymentReminderService.hasSmsPermission(context)) {
+                            val res = PaymentReminderService.sendPaymentReminder(
+                                context = context,
+                                customer = customer,
+                                shopName = shopName,
+                                templateType = selectedTemplate
+                            )
                             res.onSuccess {
                                 Toast.makeText(context, "SMS sent to ${customer.phone}", Toast.LENGTH_SHORT).show()
-                                onDirectSmsSent("SMS sent successfully")
+                                onDirectSmsSent("SMS sent successfully via SmsManager")
                                 onDismiss()
                             }.onFailure {
                                 SmsHelper.launchSmsApp(context, customer.phone, messageText)

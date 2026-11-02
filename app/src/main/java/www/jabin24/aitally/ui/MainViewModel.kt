@@ -3,9 +3,11 @@ package www.jabin24.aitally.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import www.jabin24.aitally.data.local.entity.CreditLedgerEntryEntity
 import www.jabin24.aitally.data.local.entity.CustomerEntity
 import www.jabin24.aitally.data.local.entity.TransactionEntity
 import www.jabin24.aitally.data.local.entity.UserEntity
+import www.jabin24.aitally.data.repository.SyncParityReport
 import www.jabin24.aitally.data.repository.SyncResult
 import www.jabin24.aitally.data.repository.TallyRepository
 import www.jabin24.aitally.util.SmsHelper
@@ -31,6 +33,12 @@ data class DashboardSummary(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     val repository = TallyRepository(application)
 
+    val isOnline: StateFlow<Boolean> = repository.syncRepository.isOnlineFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    private val _lastSyncParityReport = MutableStateFlow<SyncParityReport?>(null)
+    val lastSyncParityReport: StateFlow<SyncParityReport?> = _lastSyncParityReport.asStateFlow()
+
     val activeUser: StateFlow<UserEntity?> = repository.activeUserFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
@@ -45,6 +53,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    private val _selectedCustomerUid = MutableStateFlow<String?>(null)
+    val selectedCustomerUid: StateFlow<String?> = _selectedCustomerUid.asStateFlow()
 
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
@@ -63,12 +74,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _lastVerificationCode = MutableStateFlow<String?>(null)
     val lastVerificationCode: StateFlow<String?> = _lastVerificationCode.asStateFlow()
-
-    private val _showVerificationDialog = MutableStateFlow(false)
-    val showVerificationDialog: StateFlow<Boolean> = _showVerificationDialog.asStateFlow()
-
-    private val _selectedCustomerUid = MutableStateFlow<String?>(null)
-    val selectedCustomerUid: StateFlow<String?> = _selectedCustomerUid.asStateFlow()
 
     // Customers Flow based on active user and search
     val customers: StateFlow<List<CustomerEntity>> = activeUser.flatMapLatest { user ->
@@ -90,6 +95,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // All transactions for current user
     val allTransactions: StateFlow<List<TransactionEntity>> = activeUser.flatMapLatest { user ->
         if (user == null) flowOf(emptyList()) else repository.getAllTransactionsFlow(user.userUid)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Dedicated Credit Ledger Entries StateFlow stored in Room for offline access
+    val creditLedgerEntries: StateFlow<List<CreditLedgerEntryEntity>> = activeUser.flatMapLatest { user ->
+        if (user == null) flowOf(emptyList()) else repository.getAllCreditLedgerEntriesFlow(user.userUid)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Selected customer
@@ -130,15 +140,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedCustomerUid.value = customerUid
     }
 
-    fun clearAuthError() {
-        _authError.value = null
-    }
-
     fun clearSyncMessage() {
         _syncMessage.value = null
     }
 
-    // ==================== AUTH ====================
+    fun clearAuthError() {
+        _authError.value = null
+    }
+
+    fun clearVerificationStatusMessage() {
+        _verificationStatusMessage.value = null
+    }
+
+    // ==================== AUTHENTICATION & EMAIL VERIFICATION ====================
 
     fun register(
         name: String,
@@ -149,7 +163,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         onSuccess: () -> Unit = {}
     ) {
         if (name.isBlank() || email.isBlank() || password.isBlank() || phone.isBlank()) {
-            _authError.value = "Please fill in all required fields"
+            _authError.value = "Please fill in all fields / সকল তথ্য পূরণ করুন"
             return
         }
         _isAuthLoading.value = true
@@ -160,7 +174,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             result.onSuccess { createdUser ->
                 _pendingVerificationEmail.value = createdUser.email
                 _lastVerificationCode.value = createdUser.verificationCode
-                _showVerificationDialog.value = true
+                _verificationStatusMessage.value = "Registration recorded in MySQL! Verification code sent to ${createdUser.email}."
                 onSuccess()
             }.onFailure { err ->
                 _authError.value = err.message ?: "Registration failed"
@@ -170,7 +184,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun login(email: String, password: String, onSuccess: () -> Unit = {}) {
         if (email.isBlank() || password.isBlank()) {
-            _authError.value = "Please enter email and password"
+            _authError.value = "Please enter email and password / ইমেইল ও পাসওয়ার্ড লিখুন"
             return
         }
         _isAuthLoading.value = true
@@ -181,28 +195,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             result.onSuccess { user ->
                 _pendingVerificationEmail.value = user.email
                 _lastVerificationCode.value = user.verificationCode
+                _authError.value = null
                 onSuccess()
             }.onFailure { err ->
-                _authError.value = err.message ?: "Authentication failed"
+                val msg = err.message ?: "Authentication failed"
+                if (msg.startsWith("EMAIL_NOT_VERIFIED:")) {
+                    val cleanMsg = msg.removePrefix("EMAIL_NOT_VERIFIED:")
+                    _pendingVerificationEmail.value = email.trim()
+                    _verificationStatusMessage.value = cleanMsg
+                    _authError.value = cleanMsg
+                } else {
+                    _authError.value = msg
+                }
             }
         }
-    }
-
-    fun openEmailVerification(email: String) {
-        _pendingVerificationEmail.value = email.trim()
-        _verificationStatusMessage.value = null
-        _showVerificationDialog.value = true
-        // Proactively send a code if needed
-        sendEmailVerificationCode(email)
-    }
-
-    fun dismissEmailVerification() {
-        _showVerificationDialog.value = false
-        _verificationStatusMessage.value = null
-    }
-
-    fun clearVerificationStatusMessage() {
-        _verificationStatusMessage.value = null
     }
 
     fun sendEmailVerificationCode(email: String, onSent: (String) -> Unit = {}) {
@@ -212,7 +218,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         _isVerifyingEmail.value = true
-        _verificationStatusMessage.value = "Sending verification code to $targetEmail..."
+        _verificationStatusMessage.value = "Sending 6-digit verification code to $targetEmail..."
         viewModelScope.launch {
             val user = activeUser.value
             val res = repository.sendVerificationCode(targetEmail, user?.userUid)
@@ -220,10 +226,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             res.onSuccess { code ->
                 _lastVerificationCode.value = code
                 _pendingVerificationEmail.value = targetEmail
-                _verificationStatusMessage.value = "✅ Code sent! Check inbox or use code for testing."
+                _verificationStatusMessage.value = "Verification code sent to $targetEmail. Check your inbox or use testing code below."
                 onSent(code)
             }.onFailure { err ->
-                _verificationStatusMessage.value = "⚠️ " + (err.message ?: "Failed to send code")
+                _verificationStatusMessage.value = err.message ?: "Failed to send code"
             }
         }
     }
@@ -232,20 +238,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val targetEmail = email.ifBlank { _pendingVerificationEmail.value ?: activeUser.value?.email ?: "" }
         val trimmedCode = code.trim()
         if (trimmedCode.length != 6) {
-            _verificationStatusMessage.value = "Please enter the 6-digit verification code"
+            _verificationStatusMessage.value = "Please enter the 6-digit code / ৬-ডিজিটের কোড লিখুন"
             return
         }
         _isVerifyingEmail.value = true
-        _verificationStatusMessage.value = "Verifying code..."
+        _verificationStatusMessage.value = "Verifying OTP code in MySQL database..."
         viewModelScope.launch {
             val res = repository.verifyEmailCode(targetEmail, trimmedCode)
             _isVerifyingEmail.value = false
             res.onSuccess {
-                _verificationStatusMessage.value = "🎉 Email verified successfully!"
-                _showVerificationDialog.value = false
+                _verificationStatusMessage.value = "Email verified successfully!"
                 onSuccess()
             }.onFailure { err ->
-                _verificationStatusMessage.value = "❌ " + (err.message ?: "Verification failed")
+                _verificationStatusMessage.value = err.message ?: "Verification failed"
             }
         }
     }
@@ -255,7 +260,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.logout()
             _selectedCustomerUid.value = null
             _pendingVerificationEmail.value = null
-            _showVerificationDialog.value = false
         }
     }
 
@@ -340,18 +344,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isSyncing.value = true
         _syncMessage.value = "Connecting to jabin24.com/api/tally_sync.php..."
         viewModelScope.launch {
-            val res = repository.syncWithServer(user.userUid)
+            val report = repository.synchronizeWithParity(user.userUid)
+            _lastSyncParityReport.value = report
             _isSyncing.value = false
-            when (res) {
-                is SyncResult.Success -> {
-                    _syncMessage.value = "✅ ${res.message}"
-                }
-                is SyncResult.Offline -> {
-                    _syncMessage.value = "⚡ ${res.message}"
-                }
-                is SyncResult.Error -> {
-                    _syncMessage.value = "⚠️ ${res.message}"
-                }
+            if (report.isSuccess) {
+                _syncMessage.value = "✅ ${report.statusMessage}"
+            } else {
+                _syncMessage.value = "⚡ ${report.statusMessage}"
             }
         }
     }
@@ -466,6 +465,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure {
                 onComplete(false, it.message ?: "Failed to change password")
             }
+        }
+    }
+
+    /**
+     * Uses Android SmsManager via PaymentReminderService to send payment reminders
+     * to a customer stored in Room database.
+     */
+    fun sendPaymentReminderViaSmsManager(
+        customerUid: String,
+        templateType: SmsHelper.TemplateType = SmsHelper.TemplateType.BENGALI_STANDARD,
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            val result = www.jabin24.aitally.service.PaymentReminderService.sendPaymentReminderToCustomer(
+                context = getApplication(),
+                customerUid = customerUid,
+                templateType = templateType
+            )
+            result.onSuccess {
+                onComplete(true, it.message)
+            }.onFailure {
+                onComplete(false, it.message ?: "Failed to send SMS")
+            }
+        }
+    }
+
+    /**
+     * Uses Android SmsManager via PaymentReminderService to send bulk reminders
+     * to all due customers stored in Room database.
+     */
+    fun sendBatchRemindersViaSmsManager(
+        minDue: Double = 1.0,
+        onComplete: (www.jabin24.aitally.service.BatchReminderResult) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val user = activeUser.value ?: return@launch
+            val result = www.jabin24.aitally.service.PaymentReminderService.sendBatchPaymentReminders(
+                context = getApplication(),
+                userUid = user.userUid,
+                minDueAmount = minDue
+            )
+            onComplete(result)
         }
     }
 }

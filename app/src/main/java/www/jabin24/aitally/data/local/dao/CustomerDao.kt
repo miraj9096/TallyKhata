@@ -42,4 +42,10 @@ interface CustomerDao {
 
     @Query("SELECT COUNT(*) FROM customers WHERE userUid = :userUid")
     suspend fun getCustomerCount(userUid: String): Int
+
+    @Query("SELECT * FROM customers WHERE userUid = :userUid AND totalDue > 0 ORDER BY totalDue DESC")
+    suspend fun getCustomersWithDue(userUid: String): List<CustomerEntity>
+
+    @Query("SELECT * FROM customers WHERE userUid = :userUid AND totalDue > 0 ORDER BY totalDue DESC")
+    fun getCustomersWithDueFlow(userUid: String): Flow<List<CustomerEntity>>
 }

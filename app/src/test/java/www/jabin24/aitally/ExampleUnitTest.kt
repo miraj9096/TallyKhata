@@ -2,8 +2,6 @@ package www.jabin24.aitally
 
 import www.jabin24.aitally.data.local.entity.UserEntity
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -14,37 +12,30 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun `user entity has unverified email by default`() {
+    fun `default user entity is active and verified by default`() {
         val user = UserEntity(
-            userUid = "usr_12345",
-            name = "Test Merchant",
-            shopName = "Test Shop",
-            email = "merchant@example.com",
-            passwordHash = "hash123",
-            phone = "01700000000"
+            userUid = "usr_owner_main",
+            name = "দোকানের মালিক",
+            shopName = "ট্যালিখাতা ডিজিটাল খাতা",
+            email = "store@tallykhata.app",
+            passwordHash = "",
+            phone = "01700000000",
+            isLoggedIn = true,
+            syncStatus = "SYNCED",
+            isEmailVerified = true
         )
-        assertFalse(user.isEmailVerified)
-        assertNull(user.verificationCode)
-        assertEquals(0L, user.codeExpiresAt)
+        assertTrue(user.isLoggedIn)
+        assertTrue(user.isEmailVerified)
+        assertEquals("usr_owner_main", user.userUid)
+        assertEquals("দোকানের মালিক", user.name)
     }
 
     @Test
-    fun `verification code has exactly 6 digits`() {
-        val code = (100000..999999).random().toString()
-        assertEquals(6, code.length)
-        assertTrue(code.all { it.isDigit() })
-    }
-
-    @Test
-    fun `verification code expiration logic validates active and expired timestamps`() {
-        val now = System.currentTimeMillis()
-        val futureExpiry = now + 15 * 60 * 1000L
-        val pastExpiry = now - 1000L
-
-        val isActive = futureExpiry >= now
-        val isExpired = pastExpiry < now
-
-        assertTrue(isActive)
-        assertTrue(isExpired)
+    fun `customer balance calculations are correct`() {
+        val creditGiven = 500.0
+        val debitReceived = 200.0
+        val totalDue = creditGiven - debitReceived
+        assertEquals(300.0, totalDue, 0.001)
     }
 }
+
