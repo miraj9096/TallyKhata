@@ -116,6 +116,9 @@ object PaymentReminderService {
             amount = customer.totalDue
         )
 
+        val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
+        val carrierName = telephonyManager?.simOperatorName?.ifBlank { telephonyManager.networkOperatorName }?.ifBlank { "Carrier" } ?: "Carrier"
+
         return try {
             val smsManager: SmsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 context.getSystemService(SmsManager::class.java)
@@ -132,7 +135,7 @@ object PaymentReminderService {
                 smsManager.sendTextMessage(phone, null, messageText, null, null)
             }
 
-            Log.d(TAG, "Payment reminder SMS dispatched via SmsManager to $phone (${parts.size} parts)")
+            Log.d(TAG, "Payment reminder SMS dispatched via TelephonyManager carrier $carrierName to $phone (${parts.size} parts)")
 
             Result.success(
                 ReminderSendResult(
@@ -141,7 +144,7 @@ object PaymentReminderService {
                     phone = phone,
                     amount = customer.totalDue,
                     isSuccess = true,
-                    message = "Reminder SMS sent to $phone for ৳${customer.totalDue}"
+                    message = "Reminder SMS sent to $phone via $carrierName for ৳${customer.totalDue}"
                 )
             )
         } catch (e: Exception) {

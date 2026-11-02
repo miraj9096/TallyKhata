@@ -348,7 +348,7 @@ fun DashboardScreen(
             }
 
             // Relative Quick Actions Carousel
-            item {
+           /* item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -377,7 +377,7 @@ fun DashboardScreen(
                         onClick = onOpenSettings
                     )
                 }
-            }
+            }*/
 
             // Search Bar & Filter Header
             item {
