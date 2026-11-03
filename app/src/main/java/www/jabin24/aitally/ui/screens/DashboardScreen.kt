@@ -155,7 +155,7 @@ fun DashboardScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "AES-256 E2EE • Offline Ready",
+                                        text = "Offline Ready",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color(0xFFFFDDB3)
                                     )
@@ -285,7 +285,7 @@ fun DashboardScreen(
                                         }
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            "পাবেন (You'll Get)",
+                                            "পাবেন (Due)",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = TallyCashIn,
                                             fontWeight = FontWeight.Bold
