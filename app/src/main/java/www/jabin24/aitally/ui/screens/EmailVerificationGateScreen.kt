@@ -109,7 +109,7 @@ fun EmailVerificationGateScreen(
             Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = "ইমেইল ভেরিফিকেশন • Email Verification",
+                text = "Email Verification",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -118,7 +118,7 @@ fun EmailVerificationGateScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "হিসাব খাতা ও লেজার ব্যবহারের জন্য ইমেইল যাচাই আবশ্যক",
+                text = "হিসাব খাতা ব্যবহারের জন্য ইমেইল যাচাই আবশ্যক",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -133,7 +133,7 @@ fun EmailVerificationGateScreen(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
-                        text = "MySQL ডাটাবেস থেকে আপনার ইমেইলে ৬-সংখ্যার ভেরিফিকেশন কোড পাঠানো হয়েছে:",
+                        text = "আপনার ইমেইলে ৬-সংখ্যার ভেরিফিকেশন কোড পাঠানো হয়েছে:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -201,7 +201,8 @@ fun EmailVerificationGateScreen(
                         }
                     }
 
-                    // Quick Testing OTP Code Helper Badge
+                    // Quick Testing OTP Code Helper Badge (commented out per user request)
+                    /*
                     val helperCode = demoCode ?: user.verificationCode
                     if (!helperCode.isNullOrBlank()) {
                         Surface(
@@ -221,7 +222,7 @@ fun EmailVerificationGateScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Security, contentDescription = null, tint = TallyCashIn, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("MySQL OTP: ", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = TallyCashIn)
+                                    Text("OTP: ", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = TallyCashIn)
                                     Text(helperCode, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.ExtraBold, color = TallyCashIn)
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -232,12 +233,13 @@ fun EmailVerificationGateScreen(
                             }
                         }
                     }
+                    */
 
                     // 6-digit Code Input Field
                     OutlinedTextField(
                         value = codeInput,
                         onValueChange = { if (it.length <= 6) codeInput = it },
-                        label = { Text("৬-ডিজিটের ভেরিফিকেশন কোড (6-digit OTP)") },
+                        label = { Text("৬-ডিজিটের কোড (6-digit OTP)") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = TallyPrimary) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
@@ -278,7 +280,7 @@ fun EmailVerificationGateScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Text("যাচাই করা হচ্ছে...")
                         } else {
-                            Text("যাচাই সম্পন্ন করুন (Verify & Activate)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("যাচাই করুন (Verify)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
                     }
 
@@ -296,7 +298,7 @@ fun EmailVerificationGateScreen(
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("কোড পাননি? পুনরায় পাঠান (Resend Code)", color = TallyPrimary)
+                        Text("কোড পাননি? (Resend Code)", color = TallyPrimary)
                     }
                 }
             }
@@ -310,7 +312,7 @@ fun EmailVerificationGateScreen(
             ) {
                 Icon(Icons.Default.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("অন্য একাউন্টে সাইন ইন করুন (Sign Out / Change Account)", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                Text("Sign Out / Change Account", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
             }
         }
     }

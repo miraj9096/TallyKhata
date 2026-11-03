@@ -174,7 +174,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             result.onSuccess { createdUser ->
                 _pendingVerificationEmail.value = createdUser.email
                 _lastVerificationCode.value = createdUser.verificationCode
-                _verificationStatusMessage.value = "Registration recorded in MySQL! Verification code sent to ${createdUser.email}."
+                _verificationStatusMessage.value = "Verification code sent to ${createdUser.email}."
                 onSuccess()
             }.onFailure { err ->
                 _authError.value = err.message ?: "Registration failed"
@@ -226,7 +226,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             res.onSuccess { code ->
                 _lastVerificationCode.value = code
                 _pendingVerificationEmail.value = targetEmail
-                _verificationStatusMessage.value = "Verification code sent to $targetEmail. Check your inbox or use testing code below."
+                _verificationStatusMessage.value = "Verification code sent to $targetEmail. Check your inbox"
                 onSent(code)
             }.onFailure { err ->
                 _verificationStatusMessage.value = err.message ?: "Failed to send code"
@@ -242,7 +242,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         _isVerifyingEmail.value = true
-        _verificationStatusMessage.value = "Verifying OTP code in MySQL database..."
+        _verificationStatusMessage.value = "Verifying OTP code in..."
         viewModelScope.launch {
             val res = repository.verifyEmailCode(targetEmail, trimmedCode)
             _isVerifyingEmail.value = false
@@ -342,7 +342,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val user = activeUser.value ?: return
         if (_isSyncing.value) return
         _isSyncing.value = true
-        _syncMessage.value = "Connecting to jabin24.com/api/tally_sync.php..."
+        _syncMessage.value = "Connecting to database..."
         viewModelScope.launch {
             val report = repository.synchronizeWithParity(user.userUid)
             _lastSyncParityReport.value = report

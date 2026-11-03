@@ -129,14 +129,14 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "টালিখাতা • TallyKhata",
+                text = "টালিখাতা",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = TallyPrimary
             )
 
             Text(
-                text = "ডিজিটাল বাকি খাতা ও কাস্টমার লেজার",
+                text = "ডিজিটাল বাকি খাতা",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -144,7 +144,7 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // MySQL & Cloud Security Badge
-            Surface(
+            /*Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = TallyCashIn.copy(alpha = 0.12f),
                 modifier = Modifier.padding(vertical = 4.dp)
@@ -169,7 +169,7 @@ fun AuthScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(20.dp))*/
 
             // Main Authentication Card
             Card(
@@ -313,7 +313,7 @@ fun AuthScreen(
                             onClick = { selectedTab = 1 },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("একাউন্ট নেই? নতুন একাউন্ট খুলুন (Sign Up)", color = TallyPrimary)
+                            Text("একাউন্ট নেই? (Sign Up)", color = TallyPrimary)
                         }
 
                     } else {
@@ -321,7 +321,7 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = regName,
                             onValueChange = { regName = it },
-                            label = { Text("মালিকের নাম (Your Name) *") },
+                            label = { Text("মালিকের নাম (Name) *") },
                             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = TallyPrimary) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -337,7 +337,7 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = regShop,
                             onValueChange = { regShop = it },
-                            label = { Text("দোকান / ব্যবসার নাম (Shop Name) *") },
+                            label = { Text("ব্যবসার নাম (Shop Name) *") },
                             leadingIcon = { Icon(Icons.Default.Store, contentDescription = null, tint = TallyPrimary) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -353,7 +353,7 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = regPhone,
                             onValueChange = { regPhone = it },
-                            label = { Text("মোবাইল নম্বর (Phone Number) *") },
+                            label = { Text("মোবাইল (Phone Number) *") },
                             leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = TallyPrimary) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
@@ -369,7 +369,7 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = regEmail,
                             onValueChange = { regEmail = it },
-                            label = { Text("ইমেইল এড্রেস (Email for Verification) *") },
+                            label = { Text("ইমেইল (Email for Verification) *") },
                             leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = TallyPrimary) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
@@ -411,7 +411,7 @@ fun AuthScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = "ℹ️ একাউন্ট তৈরির সাথে সাথে MySQL ডাটাবেস থেকে আপনার ইমেইলে ৬-ডিজিটের ভেরিফিকেশন ওটিপি পাঠানো হবে।",
+                            text = "ℹ️ একাউন্ট তৈরির সাথে সাথে আপনার ইমেইলে ৬-ডিজিটের ভেরিফিকেশন ওটিপি পাঠানো হবে।",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -436,7 +436,7 @@ fun AuthScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text("একাউন্ট তৈরি হচ্ছে...")
                             } else {
-                                Text("একাউন্ট খুলুন (Sign Up & Verify)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text("একাউন্ট খুলুন (Sign Up)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             }
                         }
 
@@ -446,7 +446,7 @@ fun AuthScreen(
                             onClick = { selectedTab = 0 },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("পূর্বে একাউন্ট আছে? সাইন ইন করুন (Sign In)", color = TallyPrimary)
+                            Text("পূর্বে একাউন্ট আছে? (Sign In)", color = TallyPrimary)
                         }
                     }
                 }
@@ -463,7 +463,7 @@ fun AuthScreen(
                     .height(44.dp)
                     .testTag("demo_access_button")
             ) {
-                Text("তাত্ক্ষণিক ডেমো এক্সেস • Instant Evaluation Demo", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("ডেমো • Demo", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
