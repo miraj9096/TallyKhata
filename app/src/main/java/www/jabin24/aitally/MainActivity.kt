@@ -223,6 +223,7 @@ fun TallyKhataApp(
             CustomerDetailScreen(
                 customer = customer,
                 transactions = selectedCustomerTransactions,
+                shopName = user?.shopName ?: "TallyKhata Store",
                 onBack = { viewModel.selectCustomer(null) },
                 onAddCreditClick = {
                     addTxData = Triple(customer, customer.totalDue, TransactionEntity.TYPE_CREDIT_GIVEN)
@@ -349,6 +350,7 @@ fun TallyKhataApp(
                                 customers = customers,
                                 searchQuery = searchQuery,
                                 isSyncing = isSyncing,
+                                isOnline = isOnline,
                                 onSearchChange = { viewModel.updateSearchQuery(it) },
                                 onCustomerClick = { customer ->
                                     viewModel.selectCustomer(customer.customerUid)
@@ -398,6 +400,7 @@ fun TallyKhataApp(
                         NavigationTab.SETTINGS -> {
                             SettingsScreen(
                                 user = activeUser,
+                                customers = customers,
                                 defaultSmsTemplate = defaultSmsTemplate,
                                 autoSyncEnabled = autoSyncEnabled,
                                 pinLockEnabled = pinLockEnabled,

@@ -33,11 +33,16 @@ import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.WifiOff
+import android.widget.Toast
+import www.jabin24.aitally.util.PdfExportUtil
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
@@ -77,6 +82,7 @@ fun DashboardScreen(
     customers: List<CustomerEntity>,
     searchQuery: String,
     isSyncing: Boolean,
+    isOnline: Boolean = true,
     onSearchChange: (String) -> Unit,
     onCustomerClick: (CustomerEntity) -> Unit,
     onSendSmsClick: (CustomerEntity) -> Unit,
@@ -146,7 +152,7 @@ fun DashboardScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                               /* Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         Icons.Default.Security,
                                         contentDescription = null,
@@ -159,7 +165,36 @@ fun DashboardScreen(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color(0xFFFFDDB3)
                                     )
+                                }*/
+                                 // Online Connectivity Indicator
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 10.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isOnline) TallyCashIn.copy(alpha = 0.12f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        if (isOnline) Icons.Default.Wifi else Icons.Default.WifiOff,
+                                        contentDescription = null,
+                                        tint = if (isOnline) TallyCashIn else MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        if (isOnline) "Online" else "Offline",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isOnline) TallyCashIn else MaterialTheme.colorScheme.error
+                                    )
                                 }
+                            }
+                        }
                             }
                         }
 
@@ -190,7 +225,7 @@ fun DashboardScreen(
                                     ) {
                                         Icon(
                                             Icons.Default.CloudSync,
-                                            contentDescription = "Sync to jabin24.com",
+                                            contentDescription = "Sync to Database",
                                             tint = Color.White
                                         )
                                     }
@@ -348,7 +383,7 @@ fun DashboardScreen(
             }
 
             // Relative Quick Actions Layout (proportional 4-tile grid)
-            item {
+           /* item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -373,11 +408,24 @@ fun DashboardScreen(
                     )
                     RelativeActionTile(
                         modifier = Modifier.weight(1f),
-                        icon = Icons.Default.Storage,
-                        label = "ডাটাবেস",
-                        subLabel = "MySQL স্কিমা",
-                        tint = TallyCashIn,
-                        onClick = onOpenSyncDiagnostics
+                        icon = Icons.Default.Receipt,
+                        label = "PDF খাতা",
+                        subLabel = "লোকাল ড্রাইভ",
+                        tint = Color(0xFFC2185B),
+                        onClick = {
+                            val res = PdfExportUtil.exportFullStoreLedgerPdf(
+                                context = context,
+                                shopName = shopName,
+                                customers = customers,
+                                allTransactions = emptyList()
+                            )
+                            res.onSuccess { file ->
+                                Toast.makeText(context, "PDF সংরক্ষিত হয়েছে (Downloads): ${file.name}", Toast.LENGTH_LONG).show()
+                                PdfExportUtil.openOrSharePdf(context, file, "সম্পূর্ণ হিসাব খাতা PDF")
+                            }.onFailure { err ->
+                                Toast.makeText(context, "PDF export failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     )
                     RelativeActionTile(
                         modifier = Modifier.weight(1f),
@@ -388,7 +436,7 @@ fun DashboardScreen(
                         onClick = onOpenSettings
                     )
                 }
-            }
+            }*/
 
             // Search Bar & Filter Header
             item {

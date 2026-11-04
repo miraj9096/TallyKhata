@@ -88,7 +88,7 @@ fun SyncScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Cloud Sync & MySQL Schema", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("Cloud Sync", fontWeight = FontWeight.Bold, color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack, modifier = Modifier.testTag("sync_back_button")) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
@@ -131,7 +131,7 @@ fun SyncScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text("Cloud Sync Endpoint", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                    Text("https://jabin24.com/api/tally_sync.php", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    //Text("https://jabin24.com/api/tally_sync.php", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -240,7 +240,7 @@ fun SyncScreen(
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Synchronizing with jabin24.com...")
+                                Text("Synchronizing Data...")
                             } else {
                                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -327,7 +327,7 @@ fun SyncScreen(
             }
 
             // MySQL Schema & Backend API Code Section
-            item {
+            /*item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -393,7 +393,7 @@ fun SyncScreen(
                         )
                     }
                 }
-            }
+            }*/
         }
     }
 }

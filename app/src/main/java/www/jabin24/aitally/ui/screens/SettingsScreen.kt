@@ -78,19 +78,24 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import www.jabin24.aitally.data.local.entity.CustomerEntity
 import www.jabin24.aitally.data.local.entity.UserEntity
 import www.jabin24.aitally.ui.theme.TallyCashIn
 import www.jabin24.aitally.ui.theme.TallyPrimary
+import www.jabin24.aitally.util.PdfExportUtil
 import www.jabin24.aitally.util.SmsHelper
 
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MarkEmailRead
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     user: UserEntity?,
+    customers: List<CustomerEntity> = emptyList(),
     defaultSmsTemplate: SmsHelper.TemplateType,
     autoSyncEnabled: Boolean,
     pinLockEnabled: Boolean,
@@ -513,6 +518,76 @@ fun SettingsScreen(
                                 onCheckedChange = onSetAutoSync,
                                 colors = SwitchDefaults.colors(checkedThumbColor = TallyPrimary, checkedTrackColor = TallyPrimary.copy(alpha = 0.5f))
                             )
+                        }
+                    }
+                }
+            }
+
+            // Section 4.5: Data Export as PDF in Local Drive
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = TallyPrimary.copy(alpha = 0.12f),
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Receipt,
+                                        contentDescription = null,
+                                        tint = TallyPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("Data Export as PDF", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text("লোকাল ড্রাইভ / Downloads ফোল্ডারে সেভ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "আপনার সমস্ত কাস্টমারের বর্তমান বাকি/জমা হিসাব সম্পূর্ণ ফরম্যাট করা A4 সাইজ PDF ফাইলে ডিভাইসের লোকাল ড্রাইভে (Downloads/TallyKhata) সেভ ও শেয়ার করুন।",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Button(
+                            onClick = {
+                                val res = PdfExportUtil.exportFullStoreLedgerPdf(
+                                    context = context,
+                                    shopName = user?.shopName ?: "TallyKhata Store",
+                                    customers = customers,
+                                    allTransactions = emptyList()
+                                )
+                                res.onSuccess { file ->
+                                    Toast.makeText(context, "PDF সংরক্ষিত হয়েছে (Downloads): ${file.name}", Toast.LENGTH_LONG).show()
+                                    PdfExportUtil.openOrSharePdf(context, file, "সম্পূর্ণ হিসাব খাতা PDF")
+                                }.onFailure { err ->
+                                    Toast.makeText(context, "PDF export failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = TallyPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("export_full_ledger_pdf_button")
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Export Full Ledger as PDF (ডাউনলোড)", fontWeight = FontWeight.Bold)
                         }
                     }
                 }

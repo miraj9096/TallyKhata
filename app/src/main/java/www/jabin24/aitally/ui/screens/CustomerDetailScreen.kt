@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import androidx.compose.ui.unit.sp
 import www.jabin24.aitally.data.crypto.CryptoManager
 import www.jabin24.aitally.data.local.entity.CustomerEntity
@@ -64,6 +65,7 @@ import www.jabin24.aitally.data.local.entity.TransactionEntity
 import www.jabin24.aitally.ui.theme.TallyCashIn
 import www.jabin24.aitally.ui.theme.TallyCashOut
 import www.jabin24.aitally.ui.theme.TallyPrimary
+import www.jabin24.aitally.util.PdfExportUtil
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,6 +75,7 @@ import java.util.Locale
 fun CustomerDetailScreen(
     customer: CustomerEntity,
     transactions: List<TransactionEntity>,
+    shopName: String = "TallyKhata Store",
     onBack: () -> Unit,
     onAddCreditClick: () -> Unit,
     onAddDebitClick: () -> Unit,
@@ -140,6 +143,27 @@ fun CustomerDetailScreen(
                     }
                 },
                 actions = {
+                    // Export PDF Statement to local drive
+                    IconButton(
+                        onClick = {
+                            val res = PdfExportUtil.exportCustomerStatementPdf(
+                                context = context,
+                                shopName = shopName,
+                                customer = customer,
+                                transactions = transactions
+                            )
+                            res.onSuccess { file ->
+                                Toast.makeText(context, "PDF সংরক্ষিত হয়েছে (Downloads): ${file.name}", Toast.LENGTH_LONG).show()
+                                PdfExportUtil.openOrSharePdf(context, file, "${customer.name} - হিসাব স্টেটমেন্ট")
+                            }.onFailure { err ->
+                                Toast.makeText(context, "PDF export failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.testTag("export_customer_pdf_top_button")
+                    ) {
+                        Icon(Icons.Default.Receipt, contentDescription = "Export PDF", tint = Color.White)
+                    }
+
                     // Direct Phone Call
                     IconButton(onClick = {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${customer.phone}"))
@@ -253,7 +277,7 @@ fun CustomerDetailScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Relative Quick Action Bar for Customer
+                        // Relative Quick Action Bar for Customer (Call, SMS, PDF Statement)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -266,9 +290,9 @@ fun CustomerDetailScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Call", fontSize = 13.sp)
+                                Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Call", fontSize = 12.sp)
                             }
 
                             OutlinedButton(
@@ -276,9 +300,34 @@ fun CustomerDetailScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Icon(Icons.Default.Message, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("SMS", fontSize = 13.sp)
+                                Icon(Icons.Default.Message, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("SMS", fontSize = 12.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    val res = PdfExportUtil.exportCustomerStatementPdf(
+                                        context = context,
+                                        shopName = shopName,
+                                        customer = customer,
+                                        transactions = transactions
+                                    )
+                                    res.onSuccess { file ->
+                                        Toast.makeText(context, "PDF সংরক্ষিত হয়েছে (Downloads): ${file.name}", Toast.LENGTH_LONG).show()
+                                        PdfExportUtil.openOrSharePdf(context, file, "${customer.name} - হিসাব স্টেটমেন্ট")
+                                    }.onFailure { err ->
+                                        Toast.makeText(context, "PDF export failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("export_customer_pdf_btn")
+                            ) {
+                                Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(15.dp), tint = TallyPrimary)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TallyPrimary)
                             }
                         }
 
