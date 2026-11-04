@@ -81,6 +81,75 @@ function logSyncAction($pdo, $userUid, $entityType, $entityUid, $syncAction) {
     }
 }
 
+// Helper to send professional MIME HTML verification email with envelope sender -f for spam avoidance
+function sendTallyVerificationEmail($email, $name, $verifyCode) {
+    $cleanEmail = trim($email);
+    if (!filter_var($cleanEmail, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+
+    $cleanName = !empty($name) ? htmlspecialchars(trim($name), ENT_QUOTES, 'UTF-8') : 'Valued Merchant';
+    $subjectRaw = "TallyKhata Verification Code: {$verifyCode}";
+    $encodedSubject = '=?UTF-8?B?' . base64_encode($subjectRaw) . '?=';
+
+    $htmlContent = "
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='UTF-8'>
+<title>Email Verification</title>
+</head>
+<body style='font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif; background-color: #F4F6F8; margin: 0; padding: 24px; color: #2D3748;'>
+  <table width='100%' border='0' cellspacing='0' cellpadding='0'>
+    <tr>
+      <td align='center'>
+        <div style='max-width: 520px; width: 100%; background-color: #FFFFFF; border-radius: 14px; padding: 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06); border-top: 6px solid #1B5E20; text-align: left;'>
+          <h2 style='color: #1B5E20; margin-top: 0; margin-bottom: 8px; font-size: 24px;'>টালিখাতা • TallyKhata</h2>
+          <p style='color: #718096; font-size: 13px; margin-top: 0; margin-bottom: 20px;'>ডিজিটাল হিসাব খাতা ও কাস্টমার লেজার</p>
+          
+          <p style='font-size: 15px; margin-bottom: 14px;'>আসসালামু আলাইকুম / Dear <strong>{$cleanName}</strong>,</p>
+          <p style='font-size: 14px; line-height: 1.6; color: #4A5568;'>
+            টালিখাতায় আপনার একাউন্ট সক্রিয় করার জন্য ৬-ডিজিটের ভেরিফিকেশন ওটিপি কোড নিচে প্রদান করা হলো:
+          </p>
+          
+          <div style='background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); border: 2px dashed #2E7D32; border-radius: 10px; text-align: center; padding: 20px; margin: 24px 0;'>
+            <span style='font-size: 34px; font-weight: 800; letter-spacing: 10px; color: #1B5E20; font-family: Courier, \"Courier New\", monospace; display: inline-block;'>{$verifyCode}</span>
+          </div>
+          
+          <p style='font-size: 13px; color: #4A5568; line-height: 1.5;'>
+            ⏱ এই ভেরিফিকেশন কোডটি আগামী <strong>১৫ মিনিট</strong> পর্যন্ত কার্যকর থাকবে।<br>
+            অনুগ্রহ করে অ্যাপ্লিকেশনের স্ক্রিনে এই ৬-ডিজিটের কোডটি লিখুন।
+          </p>
+          <p style='font-size: 12px; color: #E53E3E; background-color: #FFF5F5; padding: 10px; border-radius: 6px;'>
+            ⚠️ যদি ইনবক্সে না পান, দয়া করে আপনার ইমেইলের <strong>Spam / Junk</strong> ফোল্ডারটি চেক করুন।
+          </p>
+          <hr style='border: none; border-top: 1px solid #EDF2F7; margin: 24px 0;'>
+          <p style='font-size: 12px; color: #A0AEC0; text-align: center; margin: 0;'>
+            TallyKhata Digital Ledger Security Team • jabin24.com<br>
+            This is an automated security message. Please do not reply directly.
+          </p>
+        </div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+";
+
+    $headers = [
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=UTF-8',
+        'From: TallyKhata <no-reply@jabin24.com>',
+        'Reply-To: support@jabin24.com',
+        'Return-Path: no-reply@jabin24.com',
+        'X-Mailer: PHP/' . phpversion()
+    ];
+    $headerString = implode("\r\n", $headers);
+
+    // Send with envelope sender parameter (-f)
+    return @mail($cleanEmail, $encodedSubject, $htmlContent, $headerString, "-fno-reply@jabin24.com");
+}
+
 // ==============================================================
 // 3. ROUTE DISPATCHER
 // ==============================================================
@@ -127,7 +196,7 @@ switch ($action) {
                 $updateStmt->execute([$name, $shopName, $phone, $passwordHash, $verifyCode, $email]);
                 $returnUid = $existing['user_uid'];
             } else {
-                // Insert new user record in MySQL
+                // Insert new user record in MySQL awaiting email verification
                 $insertStmt = $pdo->prepare("
                     INSERT INTO users (user_uid, name, shop_name, email, password_hash, phone, is_email_verified, verification_code, code_expires_at, created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, 0, ?, DATE_ADD(NOW(), INTERVAL 15 MINUTE), NOW(), NOW())
@@ -138,18 +207,16 @@ switch ($action) {
 
             logSyncAction($pdo, $returnUid, 'USER', $returnUid, 'REGISTER');
 
-            // Send verification email via PHP mail()
-            $subject = "TallyKhata Verification Code: {$verifyCode}";
-            $body = "Dear {$name},\n\nThank you for signing up on TallyKhata (ডিজিটাল হিসাব খাতা)!\n\nYour 6-digit email verification OTP code is: {$verifyCode}\n\nPlease enter this code in the app to verify your email and activate your ledger account.\nThis verification code will expire in 15 minutes.\n\nThank you,\nTallyKhata Security Team\njabin24.com";
-            $headers = "From: no-reply@jabin24.com\r\nReply-To: support@jabin24.com\r\nX-Mailer: PHP/" . phpversion();
-            @mail($email, $subject, $body, $headers);
+            // Send 6-digit verification code to user's email inbox
+            $emailSent = sendTallyVerificationEmail($email, $name, $verifyCode);
+            logSyncAction($pdo, $returnUid, 'EMAIL', $email, $emailSent ? 'REGISTER_OTP_SENT' : 'REGISTER_OTP_FAILED');
 
             echo json_encode([
-                'status'            => 'success',
-                'message'           => 'Account registered in MySQL. Verification code sent to ' . $email . '.',
+                'status'            => 'unverified',
+                'message'           => 'Verification OTP code sent to ' . $email . '. Please check your email inbox.',
                 'user_uid'          => $returnUid,
                 'email'             => $email,
-                'code'              => $verifyCode, // Returned for instant verification & development preview
+                'code'              => $verifyCode,
                 'is_email_verified' => false,
                 'user'              => [
                     'user_uid'          => $returnUid,
@@ -204,10 +271,8 @@ switch ($action) {
                         ");
                         $upStmt->execute([$code, $email]);
 
-                        $subject = "TallyKhata Verification Code: {$code}";
-                        $body = "Dear {$user['name']},\n\nYour 6-digit email verification code is: {$code}\n\nThank you,\nTallyKhata Security Team";
-                        $headers = "From: no-reply@jabin24.com\r\nReply-To: support@jabin24.com\r\nX-Mailer: PHP/" . phpversion();
-                        @mail($email, $subject, $body, $headers);
+                        sendTallyVerificationEmail($email, $user['name'], $code);
+                        logSyncAction($pdo, $user['user_uid'], 'EMAIL', $email, 'LOGIN_UNVERIFIED_OTP_SENT');
                     }
 
                     echo json_encode([
@@ -228,7 +293,6 @@ switch ($action) {
                     exit;
                 }
 
-                // Authentication passed & Email verified
                 unset($user['password_hash']);
                 $user['is_email_verified'] = true;
                 logSyncAction($pdo, $user['user_uid'], 'USER', $user['user_uid'], 'LOGIN');
@@ -272,12 +336,13 @@ switch ($action) {
             ");
             $updateCodeStmt->execute([$code, $email]);
 
-            $subject = "TallyKhata Email Verification Code: {$code}";
-            $body = "Dear TallyKhata User,\n\nYour 6-digit email verification code is: {$code}\n\nThis code will expire in 15 minutes.\n\nThank you,\nTallyKhata Security Team";
-            $headers = "From: no-reply@jabin24.com\r\nReply-To: support@jabin24.com\r\nX-Mailer: PHP/" . phpversion();
-            @mail($email, $subject, $body, $headers);
+            // Fetch user name if available
+            $nameStmt = $pdo->prepare("SELECT name FROM users WHERE email = ? LIMIT 1");
+            $nameStmt->execute([$email]);
+            $recipientName = $nameStmt->fetchColumn() ?: 'Merchant';
 
-            logSyncAction($pdo, $userUid ?: 'email:' . $email, 'AUTH', $email, 'SEND_CODE');
+            sendTallyVerificationEmail($email, $recipientName, $code);
+            logSyncAction($pdo, $userUid ?: 'email:' . $email, 'AUTH', $email, 'SEND_CODE_EMAIL');
 
             echo json_encode([
                 'status'  => 'success',

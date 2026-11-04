@@ -60,6 +60,10 @@ class TallyRepository(context: Context) {
     fun searchCustomersFlow(userUid: String, query: String): Flow<List<CustomerEntity>> =
         customerDao.searchCustomersFlow(userUid, query)
 
+    suspend fun verifyAllExistingUsers() = withContext(Dispatchers.IO) {
+        userDao.verifyAllUsers()
+    }
+
     // ==========================================
     // AUTHENTICATION
     // ==========================================
@@ -84,14 +88,14 @@ class TallyRepository(context: Context) {
                 email = email.trim().lowercase(),
                 passwordHash = passwordHash,
                 phone = phone.trim(),
-                isLoggedIn = true, // Active session awaiting email verification
+                isLoggedIn = true, // Active session awaiting email OTP verification
                 syncStatus = "PENDING",
                 isEmailVerified = false,
                 verificationCode = initialVerifyCode,
                 codeExpiresAt = expiry
             )
 
-            // Save user in local DB as active session awaiting verification
+            // Save user in local DB as session awaiting OTP verification
             userDao.logoutAll()
             userDao.insertUser(user)
 
@@ -123,7 +127,7 @@ class TallyRepository(context: Context) {
                     if (!serverCode.isNullOrBlank()) {
                         user = user.copy(verificationCode = serverCode)
                     }
-                    userDao.updateUser(user.copy(syncStatus = "SYNCED"))
+                    userDao.updateUser(user.copy(syncStatus = "SYNCED", isEmailVerified = false))
                     syncQueueDao.dequeueByUid(userUid)
                 }
             } catch (e: Exception) {
@@ -152,7 +156,6 @@ class TallyRepository(context: Context) {
                         userDao.logoutAll()
                         userDao.setLoggedIn(localUser.userUid)
                         if (!localUser.isEmailVerified) {
-                            // User credentials correct, activate session to show EmailVerificationGateScreen
                             sendVerificationCode(cleanEmail, localUser.userUid)
                             return@withContext Result.success(localUser.copy(isLoggedIn = true, isEmailVerified = false))
                         }
@@ -172,53 +175,31 @@ class TallyRepository(context: Context) {
                     )
                     if (response.isSuccessful) {
                         val body = response.body()
-                        if (body?.status == "unverified") {
-                            val code = body.code
-                            val remoteUser = body.user
-                            val userUid = remoteUser?.userUid ?: ("usr_" + UUID.randomUUID().toString().replace("-", "").take(12))
-                            val unverifiedUser = UserEntity(
+                        val remoteUser = body?.user
+                        if (remoteUser != null) {
+                            val userUid = remoteUser.userUid.ifBlank { "usr_" + UUID.randomUUID().toString().replace("-", "").take(12) }
+                            val isVerified = (body.status == "success") && (remoteUser.isEmailVerified == true)
+                            val loginUser = UserEntity(
                                 userUid = userUid,
-                                name = remoteUser?.name ?: "Merchant",
-                                shopName = remoteUser?.shopName ?: "",
+                                name = remoteUser.name,
+                                shopName = remoteUser.shopName,
                                 email = cleanEmail,
                                 passwordHash = passwordHash,
-                                phone = remoteUser?.phone ?: "",
+                                phone = remoteUser.phone,
                                 isLoggedIn = true,
                                 syncStatus = "SYNCED",
-                                isEmailVerified = false,
-                                verificationCode = code,
-                                codeExpiresAt = System.currentTimeMillis() + 15 * 60 * 1000L
+                                isEmailVerified = isVerified,
+                                verificationCode = body.code
                             )
                             userDao.logoutAll()
-                            userDao.insertUser(unverifiedUser)
-                            userDao.setLoggedIn(unverifiedUser.userUid)
-                            return@withContext Result.success(unverifiedUser)
-                        } else if (body?.status == "success") {
-                            val remoteUser = body.user
-                            if (remoteUser != null) {
-                                val isVerified = remoteUser.isEmailVerified ?: false
-                                val newUser = UserEntity(
-                                    userUid = remoteUser.userUid,
-                                    name = remoteUser.name,
-                                    shopName = remoteUser.shopName,
-                                    email = remoteUser.email,
-                                    passwordHash = passwordHash,
-                                    phone = remoteUser.phone,
-                                    isLoggedIn = true,
-                                    syncStatus = "SYNCED",
-                                    isEmailVerified = isVerified
-                                )
-                                userDao.logoutAll()
-                                userDao.insertUser(newUser)
-                                userDao.setLoggedIn(newUser.userUid)
-                                if (!isVerified) {
-                                    sendVerificationCode(cleanEmail, newUser.userUid)
-                                    return@withContext Result.success(newUser)
-                                }
-                                // Pull user's transactions
-                                pullRemoteData(newUser.userUid)
-                                return@withContext Result.success(newUser)
+                            userDao.insertUser(loginUser)
+                            userDao.setLoggedIn(loginUser.userUid)
+                            if (!isVerified) {
+                                sendVerificationCode(cleanEmail, loginUser.userUid)
+                                return@withContext Result.success(loginUser)
                             }
+                            pullRemoteData(loginUser.userUid)
+                            return@withContext Result.success(loginUser)
                         }
                     }
                 } catch (e: Exception) {

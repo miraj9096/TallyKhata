@@ -347,37 +347,48 @@ fun DashboardScreen(
                 }
             }
 
-            // Relative Quick Actions Carousel
-           /* item {
+            // Relative Quick Actions Layout (proportional 4-tile grid)
+            item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    QuickActionChip(
+                    RelativeActionTile(
+                        modifier = Modifier.weight(1f),
                         icon = Icons.Default.PersonAdd,
-                        label = "কাস্টমার যোগ",
+                        label = "কাস্টমার",
+                        subLabel = "নতুন যোগ",
+                        tint = TallyPrimary,
                         onClick = onAddCustomerClick
                     )
-                    QuickActionChip(
+                    RelativeActionTile(
+                        modifier = Modifier.weight(1f),
                         icon = Icons.Default.CloudSync,
-                        label = "ক্লাউড সিঙ্ক",
+                        label = "ক্লাউড",
+                        subLabel = "ডাটা সিঙ্ক",
+                        tint = Color(0xFF1565C0),
                         onClick = onSyncClick
                     )
-                    QuickActionChip(
+                    RelativeActionTile(
+                        modifier = Modifier.weight(1f),
                         icon = Icons.Default.Storage,
-                        label = "MySQL স্কিমা",
+                        label = "ডাটাবেস",
+                        subLabel = "MySQL স্কিমা",
+                        tint = TallyCashIn,
                         onClick = onOpenSyncDiagnostics
                     )
-                    QuickActionChip(
+                    RelativeActionTile(
+                        modifier = Modifier.weight(1f),
                         icon = Icons.Default.Settings,
                         label = "সেটিংস",
+                        subLabel = "কনফিগারেশন",
+                        tint = Color(0xFFE65100),
                         onClick = onOpenSettings
                     )
                 }
-            }*/
+            }
 
             // Search Bar & Filter Header
             item {
@@ -684,6 +695,59 @@ fun CustomerCardItem(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun RelativeActionTile(
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    subLabel: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 1.5.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        modifier = modifier.clickable { onClick() }
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = tint.copy(alpha = 0.12f),
+                modifier = Modifier.size(32.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = tint
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subLabel,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

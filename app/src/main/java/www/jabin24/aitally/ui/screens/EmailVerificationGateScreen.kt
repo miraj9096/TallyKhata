@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,14 +66,14 @@ import www.jabin24.aitally.ui.theme.TallyPrimary
 @Composable
 fun EmailVerificationGateScreen(
     user: UserEntity,
-    demoCode: String?,
+    demoCode: String? = null,
     isLoading: Boolean,
     statusMessage: String?,
     onVerify: (code: String) -> Unit,
     onResend: () -> Unit,
     onLogout: () -> Unit
 ) {
-    var codeInput by remember { mutableStateOf(demoCode ?: "") }
+    var codeInput by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
 
@@ -201,40 +202,6 @@ fun EmailVerificationGateScreen(
                         }
                     }
 
-                    // Quick Testing OTP Code Helper Badge (commented out per user request)
-                    /*
-                    val helperCode = demoCode ?: user.verificationCode
-                    if (!helperCode.isNullOrBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = TallyCashIn.copy(alpha = 0.1f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 14.dp)
-                                .clickable { codeInput = helperCode }
-                                .testTag("demo_code_badge")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Security, contentDescription = null, tint = TallyCashIn, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("OTP: ", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = TallyCashIn)
-                                    Text(helperCode, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.ExtraBold, color = TallyCashIn)
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.ContentCopy, contentDescription = null, tint = TallyCashIn, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Autofill", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TallyCashIn)
-                                }
-                            }
-                        }
-                    }
-                    */
-
                     // 6-digit Code Input Field
                     OutlinedTextField(
                         value = codeInput,
@@ -300,6 +267,15 @@ fun EmailVerificationGateScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("কোড পাননি? (Resend Code)", color = TallyPrimary)
                     }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "💡 ইমেইলটি ইনবক্সে না পেলে অনুগ্রহ করে আপনার ইমেইলের Spam বা Junk ফোল্ডার চেক করুন।",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 

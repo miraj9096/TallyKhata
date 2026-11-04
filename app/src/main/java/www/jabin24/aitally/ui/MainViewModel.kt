@@ -226,7 +226,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             res.onSuccess { code ->
                 _lastVerificationCode.value = code
                 _pendingVerificationEmail.value = targetEmail
-                _verificationStatusMessage.value = "Verification code sent to $targetEmail. Check your inbox"
+                _verificationStatusMessage.value = "Verification code sent! Check your email inbox or spam."
                 onSent(code)
             }.onFailure { err ->
                 _verificationStatusMessage.value = err.message ?: "Failed to send code"

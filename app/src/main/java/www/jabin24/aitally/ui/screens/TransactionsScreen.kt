@@ -77,6 +77,14 @@ fun TransactionsScreen(
         filteredTransactions.sumOf { it.amount }
     }
 
+    val totalCredit = remember(transactions) {
+        transactions.filter { it.type == TransactionEntity.TYPE_CREDIT_GIVEN }.sumOf { it.amount }
+    }
+
+    val totalDebit = remember(transactions) {
+        transactions.filter { it.type == TransactionEntity.TYPE_DEBIT_RECEIVED }.sumOf { it.amount }
+    }
+
     if (selectedReceiptTx != null) {
         val tx = selectedReceiptTx!!
         val customer = customerMap[tx.customerUid]
@@ -148,6 +156,58 @@ fun TransactionsScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        // Relative Proportional Summary Tiles
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = TallyCashIn.copy(alpha = 0.08f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, TallyCashIn.copy(alpha = 0.25f)),
+                modifier = Modifier.weight(1f)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        "মোট জমা (Received)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TallyCashIn,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "৳${String.format("%.2f", totalDebit)}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                        color = TallyCashIn
+                    )
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = TallyCashOut.copy(alpha = 0.08f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, TallyCashOut.copy(alpha = 0.25f)),
+                modifier = Modifier.weight(1f)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        "মোট বাকি (Credit Given)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TallyCashOut,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "৳${String.format("%.2f", totalCredit)}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                        color = TallyCashOut
+                    )
+                }
+            }
+        }
+
         // Filter Chips Bar
         Surface(
             color = MaterialTheme.colorScheme.surface,

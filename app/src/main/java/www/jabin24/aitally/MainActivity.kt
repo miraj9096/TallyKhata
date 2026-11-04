@@ -206,7 +206,6 @@ fun TallyKhataApp(
     } else if (!user.isEmailVerified) {
         EmailVerificationGateScreen(
             user = user,
-            demoCode = lastVerificationCode ?: user.verificationCode,
             isLoading = isVerifyingEmail,
             statusMessage = verificationStatusMessage,
             onVerify = { code ->

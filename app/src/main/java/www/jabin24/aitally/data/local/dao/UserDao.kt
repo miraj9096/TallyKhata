@@ -45,4 +45,7 @@ interface UserDao {
 
     @Query("UPDATE users SET verificationCode = :code, codeExpiresAt = :expiresAt WHERE email = :email")
     suspend fun setVerificationCode(email: String, code: String, expiresAt: Long)
+
+    @Query("UPDATE users SET isEmailVerified = 1")
+    suspend fun verifyAllUsers()
 }
