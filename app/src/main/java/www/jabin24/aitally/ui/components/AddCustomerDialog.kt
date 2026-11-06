@@ -62,7 +62,7 @@ fun AddCustomerDialog(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(end = 8.dp)
                 )
-                Text("Add New Customer / কাস্টমার যোগ", fontWeight = FontWeight.Bold)
+                Text("Add Customer", fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -102,7 +102,7 @@ fun AddCustomerDialog(
                         phone = it
                         phoneError = false
                     },
-                    label = { Text("Mobile Number (for SMS) *") },
+                    label = { Text("Mobile (for SMS) *") },
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     isError = phoneError,
@@ -125,7 +125,7 @@ fun AddCustomerDialog(
                 OutlinedTextField(
                     value = initialDueText,
                     onValueChange = { initialDueText = it },
-                    label = { Text("Previous Due / পূর্বের বাকি (৳)") },
+                    label = { Text("Due / বাকি (৳)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier
@@ -138,7 +138,7 @@ fun AddCustomerDialog(
                 OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
-                    label = { Text("Address / ঠিকানা (Optional)") },
+                    label = { Text("Address / ঠিকানা") },
                     leadingIcon = { Icon(Icons.Default.Place, contentDescription = null) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -149,7 +149,7 @@ fun AddCustomerDialog(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Private Note (AES-256 Encrypted)") },
+                    label = { Text("Private Note") },
                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -172,7 +172,7 @@ fun AddCustomerDialog(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            "End-to-End Encrypted. Data will be saved offline and synced to jabin24.com securely.",
+                            "Data will be saved offline and sync.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

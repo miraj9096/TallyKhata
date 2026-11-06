@@ -485,7 +485,7 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.CloudSync, contentDescription = null, tint = TallyPrimary)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Cloud Sync & MySQL", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text("Cloud Sync", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             }
 
                             Button(
@@ -500,7 +500,7 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        Text("Sync API: https://jabin24.com/api/tally_sync.php", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Sync API...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                         Spacer(modifier = Modifier.height(8.dp))
 
@@ -587,7 +587,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Export Full Ledger as PDF (ডাউনলোড)", fontWeight = FontWeight.Bold)
+                            Text("Export as PDF (ডাউনলোড)", fontWeight = FontWeight.Bold)
                         }
                     }
                 }

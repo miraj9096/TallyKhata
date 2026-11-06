@@ -129,7 +129,7 @@ fun AddTransactionDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 OutlinedTextField(
                     value = amountText,
@@ -137,7 +137,7 @@ fun AddTransactionDialog(
                         amountText = it
                         amountError = false
                     },
-                    label = { Text("Amount / টাকার পরিমাণ (৳) *") },
+                    label = { Text("Amount / টাকা (৳) *") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     isError = amountError,
                     singleLine = true,
@@ -154,12 +154,12 @@ fun AddTransactionDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 OutlinedTextField(
                     value = details,
                     onValueChange = { details = it },
-                    label = { Text("Item / Memo Description (Encrypted)") },
+                    label = { Text("Note") },
                     leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
                     singleLine = true,
                     modifier = Modifier
@@ -180,7 +180,7 @@ fun AddTransactionDialog(
                     )
                 }*/
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(5.dp))
 
                 // Balance Preview Card
                 Surface(
@@ -202,7 +202,7 @@ fun AddTransactionDialog(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
-                        Row(
+                        /*Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(top = 4.dp)
                         ) {
@@ -213,11 +213,11 @@ fun AddTransactionDialog(
                                 modifier = Modifier.padding(end = 4.dp)
                             )
                             Text(
-                                "Secured with AES-256 E2EE. Offline ready.",
+                                "Secured and Offline ready.",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        }
+                        }*/
                     }
                 }
             }
