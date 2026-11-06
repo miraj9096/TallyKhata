@@ -167,7 +167,7 @@ fun AddTransactionDialog(
                         .testTag("transaction_details_input")
                 )
 
-                if (isCredit) {
+                /*if (isCredit) { 
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = dueDaysText,
@@ -178,7 +178,7 @@ fun AddTransactionDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
-                }
+                }*/
 
                 Spacer(modifier = Modifier.height(10.dp))
 

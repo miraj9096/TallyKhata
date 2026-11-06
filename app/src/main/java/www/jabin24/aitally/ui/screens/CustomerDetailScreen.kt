@@ -251,7 +251,7 @@ fun CustomerDetailScreen(
                             Column {
                                 val due = customer.totalDue
                                 Text(
-                                    text = if (due >= 0) "Current Outstanding Balance (বাকি)" else "Advance Paid (অগ্রিম জমা)",
+                                    text = if (due >= 0) "Current Balance (বাকি)" else "Advance Paid (জমা)",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -263,7 +263,7 @@ fun CustomerDetailScreen(
                             }
 
                             // Quick SMS Reminder Button
-                            Button(
+                           /* Button(
                                 onClick = onSendSmsClick,
                                 colors = ButtonDefaults.buttonColors(containerColor = TallyPrimary),
                                 shape = RoundedCornerShape(10.dp),
@@ -272,7 +272,7 @@ fun CustomerDetailScreen(
                                 Icon(Icons.Default.Message, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("তাগাদা SMS", fontWeight = FontWeight.SemiBold)
-                            }
+                            }*/
                         }
 
                         Spacer(modifier = Modifier.height(14.dp))
@@ -290,9 +290,9 @@ fun CustomerDetailScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Call", fontSize = 12.sp)
+                                Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Call", fontSize = 10.sp)
                             }
 
                             OutlinedButton(
@@ -300,9 +300,9 @@ fun CustomerDetailScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Icon(Icons.Default.Message, contentDescription = null, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("SMS", fontSize = 12.sp)
+                                Icon(Icons.Default.Message, contentDescription = null, modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("SMS", fontSize = 10.sp)
                             }
 
                             OutlinedButton(
@@ -325,9 +325,9 @@ fun CustomerDetailScreen(
                                     .weight(1f)
                                     .testTag("export_customer_pdf_btn")
                             ) {
-                                Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(15.dp), tint = TallyPrimary)
+                                Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(12.dp), tint = TallyPrimary)
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TallyPrimary)
+                                Text("PDF", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TallyPrimary)
                             }
                         }
 
@@ -374,7 +374,7 @@ fun CustomerDetailScreen(
             item {
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "Transaction History / লেনদেন বিবরণী (${transactions.size})",
+                    text = "Transaction / লেনদেন (${transactions.size})",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
